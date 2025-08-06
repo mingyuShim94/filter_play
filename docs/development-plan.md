@@ -80,7 +80,7 @@
 - **검증 결과**: ✅ FaceDetectionService 구현, CameraScreen 통합, 상태 표시 UI
 - **소요 시간**: 45분
 
-### ✅ T2B.2: 기본 얼굴 감지 (bounding box만)
+### ✅ T2B.2: 기본 얼굴 감지 (bounding box만)[완료]
 
 - **목표**: 얼굴 영역 박스 감지
 - **구현 내용**:

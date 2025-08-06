@@ -1,10 +1,13 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:camera/camera.dart';
 import '../providers/camera_provider.dart';
 import '../services/permission_service.dart';
 import '../services/face_detection_service.dart';
+import '../services/performance_service.dart';
 import '../widgets/face_detection_overlay.dart';
+import '../widgets/performance_overlay.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 
 class CameraScreen extends ConsumerStatefulWidget {
@@ -17,6 +20,15 @@ class CameraScreen extends ConsumerStatefulWidget {
 class _CameraScreenState extends ConsumerState<CameraScreen> {
   // 현재 감지된 얼굴 목록
   List<Face> _currentFaces = [];
+  
+  // 성능 측정 서비스
+  final PerformanceService _performanceService = PerformanceService();
+  
+  // 성능 정보 출력용 프레임 카운터
+  int _frameCount = 0;
+  
+  // 얼굴 감지 처리 중 플래그 (중복 처리 방지)
+  bool _isProcessingFrame = false;
   @override
   void initState() {
     super.initState();
@@ -74,43 +86,61 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
     await ref.read(cameraProvider.notifier).startImageStream(_onImageAvailable);
   }
 
-  // 이미지 스트림 콜백 - ML Kit 얼굴 감지 실행
+  // 이미지 스트림 콜백 - ML Kit 얼굴 감지 실행 (최적화: 스마트 프레임 스킵핑)
   Future<void> _onImageAvailable(CameraImage image) async {
     // FaceDetector가 초기화되지 않았으면 종료
     if (!FaceDetectionService.isInitialized) {
       return;
     }
+    
+    // 중복 처리 방지: 이미 처리 중인 프레임이 있으면 스킵
+    if (_isProcessingFrame) {
+      return;
+    }
 
     try {
+      _isProcessingFrame = true;
+      
+      // 성능 측정 시작 (프레임 시작)
+      _performanceService.startFrame();
+      _performanceService.startFaceDetection();
+      
       // 얼굴 감지 실행 (CameraController 전달)
       final controller = ref.read(cameraProvider).controller;
       if (controller == null) return;
       
       final faces = await FaceDetectionService.detectFaces(image, controller);
       
-      // UI 업데이트를 위해 얼굴 목록 저장
-      if (mounted) {
+      // 성능 측정 완료 (얼굴 감지 완료)
+      _performanceService.endFaceDetection();
+      _performanceService.updateMemoryUsage();
+      
+      // UI 업데이트를 위해 얼굴 목록 저장 (얼굴 상태가 변경된 경우에만)
+      if (mounted && (faces.length != _currentFaces.length || faces.isNotEmpty)) {
         setState(() {
           _currentFaces = faces;
         });
       }
 
-      // 개발 단계에서 결과 출력 (나중에 제거 예정)
-      if (faces.isNotEmpty) {
-        FaceDetectionService.printFaceInfo(faces);
+      // 성능 정보 주기적 출력 (디버깅용) - 60 프레임마다 출력 (테스트용)
+      _frameCount++;
+      if (kDebugMode && _frameCount % 60 == 0) { // kDebugMode에서만 60프레임마다 출력
+        _performanceService.printPerformanceInfo();
       }
       
       // TODO: Phase 2C에서 랜드마크 추출 및 입술 감지 로직 추가
       
     } catch (e) {
       // 에러는 조용히 처리 (실시간 스트림이므로 UI 방해하지 않음)
-      print('얼굴 감지 에러: $e');
+      if (kDebugMode) print('얼굴 감지 에러: $e');
+    } finally {
+      _isProcessingFrame = false;
     }
   }
 
   // 카메라 전환 처리
   Future<void> _toggleCamera() async {
-    print('카메라 전환 시작...');
+    if (kDebugMode) print('카메라 전환 시작...');
     try {
       // 얼굴 감지 상태 초기화
       setState(() {
@@ -118,20 +148,20 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
       });
 
       // 카메라 전환
-      print('카메라 전환 시도...');
+      if (kDebugMode) print('카메라 전환 시도...');
       final success = await ref.read(cameraProvider.notifier).toggleCamera();
-      print('카메라 전환 결과: $success');
+      if (kDebugMode) print('카메라 전환 결과: $success');
       
       if (success) {
         // 카메라 전환 성공 시 이미지 스트림 재시작
-        print('이미지 스트림 재시작...');
+        if (kDebugMode) print('이미지 스트림 재시작...');
         await _startImageStream();
-        print('이미지 스트림 재시작 완료');
+        if (kDebugMode) print('이미지 스트림 재시작 완료');
       } else {
-        print('카메라 전환 실패');
+        if (kDebugMode) print('카메라 전환 실패');
       }
     } catch (e) {
-      print('카메라 전환 에러: $e');
+      if (kDebugMode) print('카메라 전환 에러: $e');
     }
   }
 
@@ -145,8 +175,10 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
     final isStreamingImages = cameraState.isStreamingImages;
     final error = cameraState.error;
     
-    // 디버깅: 카메라 전환 버튼 상태 확인
-    print('카메라 전환 버튼 상태: canToggle=$canToggle, isInitialized=$isInitialized, isLoading=$isLoading, lensDirection=$lensDirection');
+    // 디버깅: 카메라 전환 버튼 상태 확인 (최적화: kDebugMode에서만)
+    if (kDebugMode) {
+      print('카메라 전환 버튼 상태: canToggle=$canToggle, isInitialized=$isInitialized, isLoading=$isLoading, lensDirection=$lensDirection');
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -435,6 +467,12 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
               ],
             ),
           ),
+        ),
+
+        // 성능 오버레이 (우상단)
+        const PositionedPerformanceOverlay(
+          position: PerformanceOverlayPosition.topRight,
+          showDetailed: false, // 간단 모드로 시작
         ),
 
         // 게임 시작 버튼 (임시)
