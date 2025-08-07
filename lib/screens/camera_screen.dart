@@ -7,6 +7,7 @@ import '../services/permission_service.dart';
 import '../services/face_detection_service.dart';
 import '../services/performance_service.dart';
 import '../services/lip_tracking_service.dart';
+import '../services/forehead_rectangle_service.dart';
 import '../widgets/face_detection_overlay.dart';
 import '../widgets/performance_overlay.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
@@ -28,6 +29,9 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
   // T2C.4: 입 상태 관리
   final MouthStateDetector _mouthStateDetector = MouthStateDetector();
   MouthState _currentMouthState = MouthState.unknown;
+  
+  // 이마 사각형 관리
+  ForeheadRectangle? _currentForeheadRectangle;
   
   // 성능 측정 서비스
   final PerformanceService _performanceService = PerformanceService();
@@ -51,6 +55,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
     // 화면 종료 시 리소스 정리
     // ref.read는 dispose에서 사용할 수 없으므로 직접 서비스 호출
     FaceDetectionService.dispose();
+    ForeheadRectangleService.disposeTextureImage(); // 이미지 리소스 정리
     super.dispose();
   }
 
@@ -65,7 +70,15 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
       return;
     }
 
-    // 2. 카메라 초기화
+    // 2. 텍스처 이미지 백그라운드 로딩 시작 (비동기)
+    ForeheadRectangleService.loadTextureImage().catchError((e) {
+      if (kDebugMode) {
+        print('텍스처 이미지 백그라운드 로딩 실패: $e');
+      }
+      return null; // 에러 시 null 반환
+    });
+
+    // 3. 카메라 초기화
     await _initializeCamera();
   }
 
@@ -132,31 +145,45 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
 
       // T2C.2: 입술 랜드마크 추출 및 분석 (첫 번째 얼굴에 대해서만)
       LipLandmarks? lipLandmarks;
+      ForeheadRectangle? foreheadRectangle;
+      
       if (faces.isNotEmpty) {
         final firstFace = faces.first;
+        
+        // 입술 랜드마크 처리
         lipLandmarks = LipTrackingService.extractLipLandmarks(firstFace);
         
+        // 이마 사각형 처리 (비동기) - controller 전달
+        foreheadRectangle = await ForeheadRectangleService.calculateForeheadRectangle(firstFace, controller);
+        
         // 디버깅: 입술 정보를 120프레임마다 출력 (성능 영향 최소화)
-        if (kDebugMode && _frameCount % 120 == 0 && lipLandmarks.isComplete) {
-          LipTrackingService.printLipLandmarks(lipLandmarks);
+        if (kDebugMode && _frameCount % 120 == 0) {
+          if (lipLandmarks.isComplete) {
+            LipTrackingService.printLipLandmarks(lipLandmarks);
+          }
+          if (foreheadRectangle != null && foreheadRectangle.isValid) {
+            ForeheadRectangleService.printForeheadRectangle(foreheadRectangle);
+          }
         }
         
         // T2C.4: 입 상태 판정
         final newMouthState = lipLandmarks.getMouthState(_mouthStateDetector, _currentMouthState);
         
-        // 입술 랜드마크 상태 업데이트 (계산된 중심점 포함)
+        // 상태 업데이트 (입술 랜드마크와 이마 사각형)
         if (mounted) {
           setState(() {
             _currentLipLandmarks = lipLandmarks;
             _currentMouthState = newMouthState; // T2C.4: 상태 업데이트
+            _currentForeheadRectangle = foreheadRectangle;
           });
         }
       } else {
-        // 얼굴이 감지되지 않으면 입술 랜드마크도 초기화
-        if (mounted && _currentLipLandmarks != null) {
+        // 얼굴이 감지되지 않으면 모든 데이터 초기화
+        if (mounted && (_currentLipLandmarks != null || _currentForeheadRectangle != null)) {
           setState(() {
             _currentLipLandmarks = null;
             _currentMouthState = MouthState.unknown; // T2C.4: 상태도 초기화
+            _currentForeheadRectangle = null;
           });
         }
       }
@@ -179,9 +206,12 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
   Future<void> _toggleCamera() async {
     if (kDebugMode) print('카메라 전환 시작...');
     try {
-      // 얼굴 감지 상태 초기화
+      // 얼굴 감지 상태 초기화 - 모든 얼굴 관련 데이터 초기화
       setState(() {
         _currentFaces = [];
+        _currentLipLandmarks = null;
+        _currentMouthState = MouthState.unknown;
+        _currentForeheadRectangle = null;
       });
 
       // 카메라 전환
@@ -416,6 +446,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
             child: FaceDetectionOverlay(
               faces: _currentFaces,
               lipLandmarks: _currentLipLandmarks, // T2C.2: 계산된 입술 랜드마크 전달
+              foreheadRectangle: _currentForeheadRectangle, // 이마 사각형 전달
               previewSize: Size(
                 controller.value.previewSize!.height, // width에 height 값 (example code와 동일)
                 controller.value.previewSize!.width,  // height에 width 값 (example code와 동일)
@@ -428,10 +459,70 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
             ),
           ),
 
+        // 이마 사각형 상태 표시 오버레이 (우상단 상단)
+        if (_currentForeheadRectangle != null && _currentForeheadRectangle!.isValid)
+          Positioned(
+            top: 50,
+            right: 20,
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.cyan.withValues(alpha: 0.9),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.cyan, width: 1),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    '이마 사각형',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '중심: (${_currentForeheadRectangle!.center.x.toStringAsFixed(0)}, '
+                    '${_currentForeheadRectangle!.center.y.toStringAsFixed(0)})',
+                    style: const TextStyle(color: Colors.yellow, fontSize: 10),
+                  ),
+                  Text(
+                    '크기: ${_currentForeheadRectangle!.width.toStringAsFixed(0)} × '
+                    '${_currentForeheadRectangle!.height.toStringAsFixed(0)}',
+                    style: const TextStyle(color: Colors.lightGreen, fontSize: 10),
+                  ),
+                  Text(
+                    '회전Y: ${_currentForeheadRectangle!.rotationY.toStringAsFixed(1)}°',
+                    style: const TextStyle(color: Colors.orange, fontSize: 10),
+                  ),
+                  Text(
+                    '회전Z: ${_currentForeheadRectangle!.rotationZ.toStringAsFixed(1)}°',
+                    style: const TextStyle(color: Colors.pink, fontSize: 10),
+                  ),
+                  Text(
+                    '스케일: ${_currentForeheadRectangle!.scale.toStringAsFixed(2)}',
+                    style: const TextStyle(color: Colors.lightBlue, fontSize: 10),
+                  ),
+                  Text(
+                    '이미지: ${_currentForeheadRectangle!.textureImage != null ? "로딩됨" : "없음"}',
+                    style: TextStyle(
+                      color: _currentForeheadRectangle!.textureImage != null 
+                          ? Colors.green 
+                          : Colors.red, 
+                      fontSize: 10
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
         // T2C.3: 입술 거리 계산 결과 표시 오버레이 (우상단)
         if (_currentLipLandmarks != null && _currentLipLandmarks!.isComplete)
           Positioned(
-            top: 100,
+            top: 180,
             right: 20,
             child: Container(
               padding: const EdgeInsets.all(8),

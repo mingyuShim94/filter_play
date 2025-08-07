@@ -4,11 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:camera/camera.dart';
 import '../services/lip_tracking_service.dart';
+import '../services/forehead_rectangle_service.dart';
 
 /// 얼굴 감지 결과를 카메라 화면 위에 오버레이로 표시하는 위젯
 class FaceDetectionOverlay extends StatelessWidget {
   final List<Face> faces;
   final LipLandmarks? lipLandmarks; // T2C.2: 계산된 입술 랜드마크
+  final ForeheadRectangle? foreheadRectangle; // 이마 사각형
   final Size previewSize;
   final Size screenSize;
   final CameraController cameraController;
@@ -17,6 +19,7 @@ class FaceDetectionOverlay extends StatelessWidget {
     super.key,
     required this.faces,
     this.lipLandmarks, // T2C.2: nullable 파라미터로 추가
+    this.foreheadRectangle, // 이마 사각형 nullable 파라미터로 추가
     required this.previewSize,
     required this.screenSize,
     required this.cameraController,
@@ -28,6 +31,7 @@ class FaceDetectionOverlay extends StatelessWidget {
       painter: FaceDetectionPainter(
         faces: faces,
         lipLandmarks: lipLandmarks, // T2C.2: 계산된 입술 랜드마크 전달
+        foreheadRectangle: foreheadRectangle, // 이마 사각형 전달
         previewSize: previewSize,
         screenSize: screenSize,
         cameraController: cameraController,
@@ -41,6 +45,7 @@ class FaceDetectionOverlay extends StatelessWidget {
 class FaceDetectionPainter extends CustomPainter {
   final List<Face> faces;
   final LipLandmarks? lipLandmarks; // T2C.2: 계산된 입술 랜드마크
+  final ForeheadRectangle? foreheadRectangle; // 이마 사각형
   final Size previewSize;
   final Size screenSize;
   final CameraController cameraController;
@@ -50,6 +55,7 @@ class FaceDetectionPainter extends CustomPainter {
   FaceDetectionPainter({
     required this.faces,
     this.lipLandmarks, // T2C.2: nullable 파라미터로 추가
+    this.foreheadRectangle, // 이마 사각형 nullable 파라미터로 추가
     required this.previewSize,
     required this.screenSize,
     required this.cameraController,
@@ -92,6 +98,9 @@ class FaceDetectionPainter extends CustomPainter {
       
       // T2C.2: 계산된 입술 중심점들 그리기 (노란색, 보라색으로 구분)
       _drawLipCenterPoints(canvas, size);
+      
+      // 이마 사각형 그리기
+      _drawForeheadRectangle(canvas, size);
 
       // 얼굴 ID나 신뢰도가 있다면 텍스트로 표시
       final textSpan = TextSpan(
@@ -267,8 +276,113 @@ class FaceDetectionPainter extends CustomPainter {
     drawCenterPoint(lipLandmarks!.center, centerPaint, 7.0);
   }
 
+  /// 이마 사각형 그리기
+  void _drawForeheadRectangle(Canvas canvas, Size widgetSize) {
+    // 이마 사각형이 없거나 유효하지 않으면 리턴
+    if (foreheadRectangle == null || !foreheadRectangle!.isValid) return;
+
+    // 화면과 이미지 크기 비율 계산
+    final double scaleX = widgetSize.width / previewSize.width;
+    final double scaleY = widgetSize.height / previewSize.height;
+
+    final rect = foreheadRectangle!;
+    
+    // 화면 좌표로 변환된 중심점
+    final centerX = rect.center.x * scaleX;
+    final centerY = rect.center.y * scaleY;
+    
+    // 스케일이 적용된 사각형 크기
+    final scaledWidth = rect.width * rect.scale * scaleX;
+    final scaledHeight = rect.height * rect.scale * scaleY;
+
+    // 사각형 Paint 설정 - 3D 효과를 위한 그라데이션 색상
+    final rectPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3.0;
+
+    // 고정된 색상과 투명도 (안정적인 표시)
+    rectPaint.color = Colors.white.withValues(alpha: 0.8);
+
+    // Canvas 저장
+    canvas.save();
+
+    // 중심점으로 이동
+    canvas.translate(centerX, centerY);
+
+    // Z축 회전 (기울기) 적용 - 방향 반전으로 얼굴 기울기와 일치
+    canvas.rotate(-rect.rotationZ * pi / 180);
+
+    // Y축 회전을 원근감으로 표현 (스케일 변형)
+    final perspectiveScale = cos(rect.rotationY * pi / 180).abs();
+    final skewX = sin(rect.rotationY * pi / 180) * 0.3;
+    
+    // 변형 행렬 적용 (원근감)
+    final transform = Matrix4.identity()
+      ..setEntry(0, 0, perspectiveScale) // X축 스케일
+      ..setEntry(0, 1, skewX); // X축 기울기 (원근감)
+    
+    canvas.transform(transform.storage);
+
+    // 사각형 그리기 (중심 기준)
+    final drawRect = Rect.fromCenter(
+      center: Offset.zero,
+      width: scaledWidth,
+      height: scaledHeight,
+    );
+
+    // 이미지가 있으면 이미지로 채우기, 없으면 기본 사각형 그리기
+    if (rect.textureImage != null) {
+      // 이미지를 사각형 영역에 맞게 그리기
+      final srcRect = Rect.fromLTWH(
+        0, 0, 
+        rect.textureImage!.width.toDouble(), 
+        rect.textureImage!.height.toDouble()
+      );
+      
+      // 자연스러운 이미지 표시 (외곽선 없음)
+      final imagePaint = Paint()
+        ..color = Colors.white.withValues(alpha: 1.0) // 완전 불투명
+        ..filterQuality = FilterQuality.high; // 고품질 렌더링
+      
+      canvas.drawImageRect(rect.textureImage!, srcRect, drawRect, imagePaint);
+    } else {
+      // 기본 사각형 렌더링 (이미지가 없는 경우)
+      
+      // 외곽선 그리기
+      canvas.drawRect(drawRect, rectPaint);
+      
+      // 이너 글로우 효과 (여러 레이어)
+      for (int i = 3; i > 0; i--) {
+        final glowPaint = Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = i * 2.0
+          ..color = rectPaint.color.withValues(alpha: 0.1 / i);
+        canvas.drawRect(drawRect, glowPaint);
+      }
+
+      // 내부 채우기 (고정된 투명도)
+      final fillPaint = Paint()
+        ..style = PaintingStyle.fill
+        ..color = rectPaint.color.withValues(alpha: 0.2);
+      canvas.drawRect(drawRect, fillPaint);
+    }
+
+    // 중심점 표시 제거 (더 깔끔한 효과)
+
+    // Canvas 복원
+    canvas.restore();
+
+    // 디버깅: 이마 사각형 정보 출력 (120프레임마다)
+    if (kDebugMode && !_debugPrinted) {
+      print('ForeheadRectangle Draw: center(${centerX.toStringAsFixed(1)}, ${centerY.toStringAsFixed(1)}), '
+            'size(${scaledWidth.toStringAsFixed(1)} x ${scaledHeight.toStringAsFixed(1)}), '
+            'rotY: ${rect.rotationY.toStringAsFixed(1)}°, rotZ: ${rect.rotationZ.toStringAsFixed(1)}°');
+    }
+  }
+
   @override
   bool shouldRepaint(FaceDetectionPainter oldDelegate) {
-    return oldDelegate.faces != faces;
+    return oldDelegate.faces != faces || 
+           oldDelegate.foreheadRectangle != foreheadRectangle;
   }
 }
