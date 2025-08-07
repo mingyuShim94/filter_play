@@ -1,10 +1,14 @@
+import 'dart:math';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:camera/camera.dart';
+import '../services/lip_tracking_service.dart';
 
 /// 얼굴 감지 결과를 카메라 화면 위에 오버레이로 표시하는 위젯
 class FaceDetectionOverlay extends StatelessWidget {
   final List<Face> faces;
+  final LipLandmarks? lipLandmarks; // T2C.2: 계산된 입술 랜드마크
   final Size previewSize;
   final Size screenSize;
   final CameraController cameraController;
@@ -12,6 +16,7 @@ class FaceDetectionOverlay extends StatelessWidget {
   const FaceDetectionOverlay({
     super.key,
     required this.faces,
+    this.lipLandmarks, // T2C.2: nullable 파라미터로 추가
     required this.previewSize,
     required this.screenSize,
     required this.cameraController,
@@ -22,6 +27,7 @@ class FaceDetectionOverlay extends StatelessWidget {
     return CustomPaint(
       painter: FaceDetectionPainter(
         faces: faces,
+        lipLandmarks: lipLandmarks, // T2C.2: 계산된 입술 랜드마크 전달
         previewSize: previewSize,
         screenSize: screenSize,
         cameraController: cameraController,
@@ -34,14 +40,16 @@ class FaceDetectionOverlay extends StatelessWidget {
 /// 얼굴 bounding box를 그리는 CustomPainter
 class FaceDetectionPainter extends CustomPainter {
   final List<Face> faces;
+  final LipLandmarks? lipLandmarks; // T2C.2: 계산된 입술 랜드마크
   final Size previewSize;
   final Size screenSize;
   final CameraController cameraController;
-  
-  static bool _debugPrinted = false;  // 디버깅용 플래그
+
+  static bool _debugPrinted = false; // 디버깅용 플래그
 
   FaceDetectionPainter({
     required this.faces,
+    this.lipLandmarks, // T2C.2: nullable 파라미터로 추가
     required this.previewSize,
     required this.screenSize,
     required this.cameraController,
@@ -49,11 +57,16 @@ class FaceDetectionPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    // 디버깅 플래그 초기화 (매번 새로운 프레임마다 로그 출력을 위해)
+    _debugPrinted = false;
+
     // 얼굴 bounding box 스타일 설정
-    final paint = Paint()
+    final facePaint = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.0
       ..color = Colors.green;
+
+    // 랜드마크는 _drawLandmarks에서 별도로 처리
 
     // 얼굴 개수 텍스트 스타일
     final textStyle = TextStyle(
@@ -72,24 +85,30 @@ class FaceDetectionPainter extends CustomPainter {
       );
 
       // 얼굴 bounding box 그리기
-      canvas.drawRect(rect, paint);
+      canvas.drawRect(rect, facePaint);
+
+      // T2C.1 & T2C.2: 얼굴 랜드마크 그리기 (입술은 빨간색으로 구분)
+      _drawLandmarks(canvas, face, size);
+      
+      // T2C.2: 계산된 입술 중심점들 그리기 (노란색, 보라색으로 구분)
+      _drawLipCenterPoints(canvas, size);
 
       // 얼굴 ID나 신뢰도가 있다면 텍스트로 표시
       final textSpan = TextSpan(
         text: 'Face',
         style: textStyle,
       );
-      
+
       final textPainter = TextPainter(
         text: textSpan,
         textDirection: TextDirection.ltr,
       );
-      
+
       textPainter.layout();
-      
+
       // bounding box 상단에 텍스트 표시
       textPainter.paint(
-        canvas, 
+        canvas,
         Offset(rect.left, rect.top - textPainter.height - 4),
       );
     }
@@ -104,14 +123,14 @@ class FaceDetectionPainter extends CustomPainter {
           backgroundColor: Colors.green.withValues(alpha: 0.8),
         ),
       );
-      
+
       final countPainter = TextPainter(
         text: countText,
         textDirection: TextDirection.ltr,
       );
-      
+
       countPainter.layout();
-      
+
       // 왼쪽 상단에 개수 표시
       final backgroundRect = Rect.fromLTWH(
         8,
@@ -119,12 +138,12 @@ class FaceDetectionPainter extends CustomPainter {
         countPainter.width + 16,
         countPainter.height + 8,
       );
-      
+
       canvas.drawRRect(
         RRect.fromRectAndRadius(backgroundRect, const Radius.circular(4)),
         Paint()..color = Colors.green.withValues(alpha: 0.8),
       );
-      
+
       countPainter.paint(canvas, const Offset(16, 12));
     }
   }
@@ -135,45 +154,117 @@ class FaceDetectionPainter extends CustomPainter {
     required Size imageSize,
     required Size widgetSize,
   }) {
-    // 디버깅: 첫 번째 얼굴에 대해서만 좌표 정보 출력
-    if (!_debugPrinted && faces.isNotEmpty) {
-      print('=== 좌표 변환 디버깅 ===');
-      print('Original rect: $rect');
-      print('ImageSize: $imageSize');
-      print('WidgetSize: $widgetSize');
+    // 디버깅: 첫 번째 얼굴에 대해서만 좌표 정보 출력 (개발용)
+    if (kDebugMode && !_debugPrinted && faces.isNotEmpty) {
+      print('=== Bounding Box 변환 디버깅 ===');
       print('Camera: ${cameraController.description.lensDirection}');
+      print('ImageSize: $imageSize, WidgetSize: $widgetSize');
       _debugPrinted = true;
     }
-    
+
     // 화면과 이미지 크기 비율 계산 (example code와 동일)
     final double scaleX = widgetSize.width / imageSize.width;
     final double scaleY = widgetSize.height / imageSize.height;
-    
-    if (!_debugPrinted && faces.isNotEmpty) {
-      print('ScaleX: $scaleX, ScaleY: $scaleY');
-    }
-    
-    // 전면 카메라인 경우 horizontal flip 처리 (example code와 동일)
+
+    // 좌표 오프셋 (전면카메라 변환은 랜드마크에서만 처리)
     double leftOffset = rect.left;
-    if (cameraController.description.lensDirection == CameraLensDirection.front) {
-      leftOffset = imageSize.width - rect.right;
-    }
-    
+
     // 좌표 변환 (example code와 동일)
     final double left = leftOffset * scaleX;
     final double top = rect.top * scaleY;
     final double right = (leftOffset + rect.width) * scaleX;
     final double bottom = (rect.top + rect.height) * scaleY;
-    
+
     final result = Rect.fromLTRB(left, top, right, bottom);
-    
-    if (!_debugPrinted && faces.isNotEmpty) {
-      print('LeftOffset: $leftOffset');
-      print('Result rect: $result');
-      _debugPrinted = true;
-    }
-    
+
     return result;
+  }
+
+  /// 개별 얼굴의 모든 랜드마크를 그리는 메서드 (example code 참조)
+  void _drawLandmarks(Canvas canvas, Face face, Size widgetSize) {
+    // 기본 랜드마크 포인트 스타일 (파란색)
+    final landmarkPaint = Paint()
+      ..style = PaintingStyle.fill
+      ..color = Colors.blue;
+
+    // T2C.2: 입술 랜드마크 전용 스타일 (빨간색)
+    final lipLandmarkPaint = Paint()
+      ..style = PaintingStyle.fill
+      ..color = Colors.red;
+
+    // 화면과 이미지 크기 비율 계산
+    final double scaleX = widgetSize.width / previewSize.width;
+    final double scaleY = widgetSize.height / previewSize.height;
+
+    // 개별 랜드마크를 그리는 헬퍼 함수 (example code 방식)
+    void drawLandmark(FaceLandmarkType type,
+        {bool isLipLandmark = false, double radius = 4.0}) {
+      if (face.landmarks[type] != null) {
+        final point = face.landmarks[type]!.position;
+        final originalX = point.x.toDouble();
+        double pointX = originalX;
+
+        // 좌표 스케일링 적용하여 원 그리기
+        canvas.drawCircle(
+          Offset(pointX * scaleX, point.y * scaleY),
+          radius,
+          isLipLandmark ? lipLandmarkPaint : landmarkPaint,
+        );
+      }
+    }
+
+    // T2C.1: 일반 얼굴 랜드마크 그리기 (파란색)
+    drawLandmark(FaceLandmarkType.leftEye);
+    drawLandmark(FaceLandmarkType.rightEye);
+    drawLandmark(FaceLandmarkType.noseBase);
+    drawLandmark(FaceLandmarkType.leftEar);
+    drawLandmark(FaceLandmarkType.rightEar);
+    drawLandmark(FaceLandmarkType.leftCheek);
+    drawLandmark(FaceLandmarkType.rightCheek);
+
+    // T2C.2: 입술 특정 랜드마크 그리기 (빨간색, 큰 원)
+    drawLandmark(FaceLandmarkType.leftMouth, isLipLandmark: true, radius: 6.0);
+    drawLandmark(FaceLandmarkType.rightMouth, isLipLandmark: true, radius: 6.0);
+    drawLandmark(FaceLandmarkType.bottomMouth,
+        isLipLandmark: true, radius: 6.0);
+  }
+
+  /// T2C.2: 계산된 입술 중심점들을 그리는 메서드
+  void _drawLipCenterPoints(Canvas canvas, Size widgetSize) {
+    // 입술 랜드마크가 없으면 리턴
+    if (lipLandmarks == null || !lipLandmarks!.isComplete) return;
+
+    // 화면과 이미지 크기 비율 계산
+    final double scaleX = widgetSize.width / previewSize.width;
+    final double scaleY = widgetSize.height / previewSize.height;
+
+    // 윗입술 중심점 스타일 (노란색)
+    final upperLipPaint = Paint()
+      ..style = PaintingStyle.fill
+      ..color = Colors.yellow;
+
+    // 입술 전체 중심점 스타일 (보라색)
+    final centerPaint = Paint()
+      ..style = PaintingStyle.fill
+      ..color = Colors.purple;
+
+    // 계산된 중심점 그리기 헬퍼 함수
+    void drawCenterPoint(Point<double>? point, Paint paint, double radius) {
+      if (point != null) {
+        // 좌표 스케일링 적용하여 원 그리기
+        canvas.drawCircle(
+          Offset(point.x * scaleX, point.y * scaleY),
+          radius,
+          paint,
+        );
+      }
+    }
+
+    // 윗입술 중심점 그리기 (노란색, 중간 크기)
+    drawCenterPoint(lipLandmarks!.upperLip, upperLipPaint, 5.0);
+
+    // 입술 전체 중심점 그리기 (보라색, 큰 크기)
+    drawCenterPoint(lipLandmarks!.center, centerPaint, 7.0);
   }
 
   @override

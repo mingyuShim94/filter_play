@@ -6,6 +6,7 @@ import '../providers/camera_provider.dart';
 import '../services/permission_service.dart';
 import '../services/face_detection_service.dart';
 import '../services/performance_service.dart';
+import '../services/lip_tracking_service.dart';
 import '../widgets/face_detection_overlay.dart';
 import '../widgets/performance_overlay.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
@@ -20,6 +21,13 @@ class CameraScreen extends ConsumerStatefulWidget {
 class _CameraScreenState extends ConsumerState<CameraScreen> {
   // 현재 감지된 얼굴 목록
   List<Face> _currentFaces = [];
+  
+  // T2C.2: 현재 감지된 입술 랜드마크 (첫 번째 얼굴)
+  LipLandmarks? _currentLipLandmarks;
+  
+  // T2C.4: 입 상태 관리
+  final MouthStateDetector _mouthStateDetector = MouthStateDetector();
+  MouthState _currentMouthState = MouthState.unknown;
   
   // 성능 측정 서비스
   final PerformanceService _performanceService = PerformanceService();
@@ -48,8 +56,8 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
 
   // 전체 초기화 프로세스
   Future<void> _initializeAll() async {
-    // 1. FaceDetector 초기화
-    final faceDetectorSuccess = await FaceDetectionService.initialize();
+    // 1. FaceDetector Phase 2C 모드로 초기화 (랜드마크 활성화)
+    final faceDetectorSuccess = await FaceDetectionService.reinitializeForPhase2C();
     if (!faceDetectorSuccess) {
       if (mounted) {
         ref.read(cameraProvider.notifier).setError('얼굴 인식 초기화에 실패했습니다');
@@ -122,13 +130,42 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
         });
       }
 
+      // T2C.2: 입술 랜드마크 추출 및 분석 (첫 번째 얼굴에 대해서만)
+      LipLandmarks? lipLandmarks;
+      if (faces.isNotEmpty) {
+        final firstFace = faces.first;
+        lipLandmarks = LipTrackingService.extractLipLandmarks(firstFace);
+        
+        // 디버깅: 입술 정보를 120프레임마다 출력 (성능 영향 최소화)
+        if (kDebugMode && _frameCount % 120 == 0 && lipLandmarks.isComplete) {
+          LipTrackingService.printLipLandmarks(lipLandmarks);
+        }
+        
+        // T2C.4: 입 상태 판정
+        final newMouthState = lipLandmarks.getMouthState(_mouthStateDetector, _currentMouthState);
+        
+        // 입술 랜드마크 상태 업데이트 (계산된 중심점 포함)
+        if (mounted) {
+          setState(() {
+            _currentLipLandmarks = lipLandmarks;
+            _currentMouthState = newMouthState; // T2C.4: 상태 업데이트
+          });
+        }
+      } else {
+        // 얼굴이 감지되지 않으면 입술 랜드마크도 초기화
+        if (mounted && _currentLipLandmarks != null) {
+          setState(() {
+            _currentLipLandmarks = null;
+            _currentMouthState = MouthState.unknown; // T2C.4: 상태도 초기화
+          });
+        }
+      }
+
       // 성능 정보 주기적 출력 (디버깅용) - 60 프레임마다 출력 (테스트용)
       _frameCount++;
       if (kDebugMode && _frameCount % 60 == 0) { // kDebugMode에서만 60프레임마다 출력
         _performanceService.printPerformanceInfo();
       }
-      
-      // TODO: Phase 2C에서 랜드마크 추출 및 입술 감지 로직 추가
       
     } catch (e) {
       // 에러는 조용히 처리 (실시간 스트림이므로 UI 방해하지 않음)
@@ -378,6 +415,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
           Positioned.fill(
             child: FaceDetectionOverlay(
               faces: _currentFaces,
+              lipLandmarks: _currentLipLandmarks, // T2C.2: 계산된 입술 랜드마크 전달
               previewSize: Size(
                 controller.value.previewSize!.height, // width에 height 값 (example code와 동일)
                 controller.value.previewSize!.width,  // height에 width 값 (example code와 동일)
@@ -387,6 +425,99 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
                 MediaQuery.of(context).size.height,
               ),
               cameraController: controller,
+            ),
+          ),
+
+        // T2C.3: 입술 거리 계산 결과 표시 오버레이 (우상단)
+        if (_currentLipLandmarks != null && _currentLipLandmarks!.isComplete)
+          Positioned(
+            top: 100,
+            right: 20,
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.purple.withValues(alpha: 0.9),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.purple, width: 1),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Text(
+                        'T2C.4: 입술 상태',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      // T2C.4: 상태에 따른 색상 표시
+                      Container(
+                        width: 12,
+                        height: 12,
+                        decoration: BoxDecoration(
+                          color: _getMouthStateColor(_currentMouthState),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '높이: ${_currentLipLandmarks!.lipHeight.toStringAsFixed(1)}px',
+                    style: const TextStyle(color: Colors.yellow, fontSize: 10),
+                  ),
+                  Text(
+                    '너비: ${_currentLipLandmarks!.lipWidth.toStringAsFixed(1)}px',
+                    style: const TextStyle(color: Colors.yellow, fontSize: 10),
+                  ),
+                  const SizedBox(height: 2),
+                  // 입 닫힘 인식 개선: 현재 값과 threshold 비교 표시
+                  Text(
+                    '정규화 H: ${_currentLipLandmarks!.normalizedLipHeight.toStringAsFixed(4)}',
+                    style: TextStyle(
+                      color: _getCurrentValueColor(_currentLipLandmarks!.normalizedLipHeight), 
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  Text(
+                    '정규화 W: ${_currentLipLandmarks!.normalizedLipWidth.toStringAsFixed(3)}',
+                    style: const TextStyle(color: Colors.lightGreen, fontSize: 10),
+                  ),
+                  Text(
+                    '개방률: ${_currentLipLandmarks!.lipOpenRatio.toStringAsFixed(3)}',
+                    style: const TextStyle(color: Colors.orange, fontSize: 10),
+                  ),
+                  const SizedBox(height: 2),
+                  // T2C.4: 입 상태 및 threshold 표시
+                  Text(
+                    '상태: ${_getMouthStateText(_currentMouthState)}',
+                    style: TextStyle(
+                      color: _getMouthStateColor(_currentMouthState),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  if (_mouthStateDetector.isCalibrated) ...[
+                    Text(
+                      'Open: ${_mouthStateDetector.thresholds["open"]!.toStringAsFixed(4)}',
+                      style: const TextStyle(color: Colors.cyan, fontSize: 9),
+                    ),
+                    Text(
+                      'Close: ${_mouthStateDetector.thresholds["close"]!.toStringAsFixed(4)}',
+                      style: const TextStyle(color: Colors.cyan, fontSize: 9),
+                    ),
+                  ] else
+                    Text(
+                      '캘리브레이션: ${(_mouthStateDetector.calibrationProgress * 100).toStringAsFixed(0)}%',
+                      style: const TextStyle(color: Colors.lightBlue, fontSize: 9),
+                    ),
+                ],
+              ),
             ),
           ),
 
@@ -500,5 +631,48 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
         ),
       ],
     );
+  }
+
+  /// T2C.4: 입 상태에 따른 색상 반환
+  Color _getMouthStateColor(MouthState state) {
+    switch (state) {
+      case MouthState.open:
+        return Colors.green;
+      case MouthState.closed:
+        return Colors.red;
+      case MouthState.unknown:
+        return Colors.yellow;
+    }
+  }
+
+  /// T2C.4: 입 상태에 따른 텍스트 반환
+  String _getMouthStateText(MouthState state) {
+    switch (state) {
+      case MouthState.open:
+        return 'OPEN';
+      case MouthState.closed:
+        return 'CLOSED';
+      case MouthState.unknown:
+        return 'UNKNOWN';
+    }
+  }
+
+  /// 입 닫힘 인식 개선: 현재 normalizedHeight 값의 색상 반환
+  Color _getCurrentValueColor(double normalizedHeight) {
+    if (!_mouthStateDetector.isCalibrated) {
+      return Colors.lightBlue; // 캘리브레이션 중
+    }
+    
+    final thresholds = _mouthStateDetector.thresholds;
+    final closeThreshold = thresholds['close']!;
+    final openThreshold = thresholds['open']!;
+    
+    if (normalizedHeight < closeThreshold) {
+      return Colors.red; // 닫힘 영역
+    } else if (normalizedHeight > openThreshold) {
+      return Colors.green; // 열림 영역
+    } else {
+      return Colors.orange; // 중간 영역 (히스테리시스 구간)
+    }
   }
 }

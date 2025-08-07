@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/performance_service.dart';
+import '../services/face_detection_service.dart';
 
 /// 실시간 성능 정보를 화면에 표시하는 오버레이 위젯
 class PerformanceOverlay extends StatefulWidget {
@@ -79,6 +80,11 @@ class _PerformanceOverlayState extends State<PerformanceOverlay> {
           isGood: _performanceService.isLatencyGood,
           unit: 'ms',
         ),
+        
+        const SizedBox(width: 16),
+        
+        // 랜드마크 상태 표시 (T2C.1)
+        _buildLandmarkStatus(),
         
         // 경고 아이콘 (성능 이상 시)
         if (!_performanceService.isPerformanceGood) ...[
@@ -269,6 +275,31 @@ class _PerformanceOverlayState extends State<PerformanceOverlay> {
         color: color,
         fontSize: 11,
       ),
+    );
+  }
+
+  /// 랜드마크 활성화 상태 표시 (T2C.1)
+  Widget _buildLandmarkStatus() {
+    final isLandmarksEnabled = FaceDetectionService.isInitialized;
+    
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          Icons.face,
+          color: isLandmarksEnabled ? Colors.blue : Colors.grey,
+          size: 16,
+        ),
+        const SizedBox(width: 4),
+        Text(
+          'LM',  // Landmarks 약자
+          style: TextStyle(
+            color: isLandmarksEnabled ? Colors.blue : Colors.grey,
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
     );
   }
 }
