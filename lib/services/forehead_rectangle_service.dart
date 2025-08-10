@@ -96,10 +96,10 @@ class ForeheadRectangleService {
   static const double _foreheadWidthRatio = 0.5; // 얼굴 너비의 50% (적절한 크기)
   static const double _foreheadHeightRatio = 0.25; // 얼굴 높이의 25% (적절한 비율)
   
-  // 이미지 캐싱
-  static ui.Image? _cachedTextureImage;
-  static bool _isLoadingImage = false;
-  static const String _textureImagePath = 'assets/images/sample.jpg';
+  // 이미지 캐싱 (다중 이미지 지원)
+  static final Map<String, ui.Image> _cachedTextureImages = {};
+  static final Set<String> _loadingImages = {};
+  static const int _maxCacheSize = 15; // 최대 캐시 크기
   
   // 스케일 계산을 위한 기준값들
   static const double _baseFaceSize = 200.0; // 기준 얼굴 크기 (픽셀)
@@ -110,63 +110,92 @@ class ForeheadRectangleService {
   static const double _maxRotationY = 30.0; // Y축 회전 최대값 (도) - 더 부드럽게
   static const double _maxRotationZ = 20.0; // Z축 회전 최대값 (도) - 더 부드럽게
   
-  /// 텍스처 이미지 로딩 (비동기, 캐싱됨)
-  static Future<ui.Image?> loadTextureImage() async {
+  /// 특정 경로의 텍스처 이미지 로딩 (비동기, 캐싱됨)
+  static Future<ui.Image?> loadTextureImage(String? imagePath) async {
+    // 이미지 경로가 없으면 null 반환
+    if (imagePath == null || imagePath.isEmpty) {
+      return null;
+    }
+
     // 이미 캐싱된 이미지가 있으면 반환
-    if (_cachedTextureImage != null) {
-      return _cachedTextureImage;
+    if (_cachedTextureImages.containsKey(imagePath)) {
+      return _cachedTextureImages[imagePath];
     }
     
     // 이미 로딩 중이면 대기
-    if (_isLoadingImage) {
+    if (_loadingImages.contains(imagePath)) {
       // 간단한 폴링으로 로딩 완료 대기 (최대 5초)
       for (int i = 0; i < 50; i++) {
         await Future.delayed(const Duration(milliseconds: 100));
-        if (!_isLoadingImage && _cachedTextureImage != null) {
-          return _cachedTextureImage;
+        if (!_loadingImages.contains(imagePath) && _cachedTextureImages.containsKey(imagePath)) {
+          return _cachedTextureImages[imagePath];
         }
       }
       return null;
     }
     
     try {
-      _isLoadingImage = true;
+      _loadingImages.add(imagePath);
+      
+      // 캐시 크기 체크 및 정리
+      if (_cachedTextureImages.length >= _maxCacheSize) {
+        _clearOldestCacheEntries();
+      }
       
       // AssetImage로부터 이미지 데이터 로딩
-      final ByteData data = await rootBundle.load(_textureImagePath);
+      final ByteData data = await rootBundle.load(imagePath);
       final Uint8List bytes = data.buffer.asUint8List();
       
       // ui.Image로 디코딩
       final ui.Codec codec = await ui.instantiateImageCodec(bytes);
       final ui.FrameInfo frameInfo = await codec.getNextFrame();
       
-      _cachedTextureImage = frameInfo.image;
+      _cachedTextureImages[imagePath] = frameInfo.image;
       
       if (kDebugMode) {
-        print('텍스처 이미지 로딩 완료: ${_cachedTextureImage!.width}x${_cachedTextureImage!.height}');
+        print('텍스처 이미지 로딩 완료: $imagePath (${frameInfo.image.width}x${frameInfo.image.height})');
       }
       
-      return _cachedTextureImage;
+      return _cachedTextureImages[imagePath];
       
     } catch (e) {
       if (kDebugMode) {
-        print('텍스처 이미지 로딩 실패: $e');
+        print('텍스처 이미지 로딩 실패: $imagePath - $e');
       }
       return null;
     } finally {
-      _isLoadingImage = false;
+      _loadingImages.remove(imagePath);
+    }
+  }
+
+  /// 가장 오래된 캐시 항목들 정리
+  static void _clearOldestCacheEntries() {
+    if (_cachedTextureImages.length > _maxCacheSize ~/ 2) {
+      final keys = _cachedTextureImages.keys.toList();
+      final keysToRemove = keys.take(_maxCacheSize ~/ 4).toList(); // 1/4 정도 제거
+      
+      for (final key in keysToRemove) {
+        _cachedTextureImages[key]?.dispose();
+        _cachedTextureImages.remove(key);
+      }
+      
+      if (kDebugMode) {
+        print('이미지 캐시 정리: ${keysToRemove.length}개 항목 제거');
+      }
     }
   }
   
   /// 캐싱된 텍스처 이미지 해제
   static void disposeTextureImage() {
-    _cachedTextureImage?.dispose();
-    _cachedTextureImage = null;
-    _isLoadingImage = false;
+    for (final image in _cachedTextureImages.values) {
+      image.dispose();
+    }
+    _cachedTextureImages.clear();
+    _loadingImages.clear();
   }
 
   /// 얼굴 데이터로부터 이마 사각형 정보를 계산
-  static Future<ForeheadRectangle?> calculateForeheadRectangle(Face face, CameraController controller) async {
+  static Future<ForeheadRectangle?> calculateForeheadRectangle(Face face, CameraController controller, {String? imagePath}) async {
     try {
       // 필수 랜드마크 확인
       final leftEye = face.landmarks[FaceLandmarkType.leftEye];
@@ -219,7 +248,7 @@ class ForeheadRectangleService {
       // 텍스처 이미지 로딩 (비동기이지만 캐싱되어 있다면 즉시 반환)
       ui.Image? textureImage;
       try {
-        textureImage = await loadTextureImage();
+        textureImage = await loadTextureImage(imagePath);
       } catch (e) {
         if (kDebugMode) {
           print('텍스처 이미지 로딩 중 오류: $e');

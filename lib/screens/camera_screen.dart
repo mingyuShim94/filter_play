@@ -3,23 +3,35 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:camera/camera.dart';
 import '../providers/camera_provider.dart';
+import '../providers/ranking_game_provider.dart';
 import '../services/permission_service.dart';
 import '../services/face_detection_service.dart';
 import '../services/performance_service.dart';
 import '../services/lip_tracking_service.dart';
 import '../services/forehead_rectangle_service.dart';
+import '../services/ranking_data_service.dart';
 import '../widgets/face_detection_overlay.dart';
 import '../widgets/performance_overlay.dart';
+import '../widgets/ranking_slot_panel.dart';
+import '../models/filter_item.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 
 class CameraScreen extends ConsumerStatefulWidget {
-  const CameraScreen({super.key});
+  final FilterItem? selectedFilter;
+  
+  const CameraScreen({
+    super.key, 
+    this.selectedFilter,
+  });
 
   @override
   ConsumerState<CameraScreen> createState() => _CameraScreenState();
 }
 
 class _CameraScreenState extends ConsumerState<CameraScreen> {
+  // 디버깅 표시 활성화 플래그 (개발 시에만 true로 설정)
+  static const bool _showDebugInfo = false; // false로 설정하여 디버깅 표시 비활성화
+  
   // 현재 감지된 얼굴 목록
   List<Face> _currentFaces = [];
   
@@ -47,7 +59,19 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
     // 화면 로드 후 초기화
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeAll();
+      _initializeRankingGame();
     });
+  }
+
+  // 랭킹 게임 초기화
+  void _initializeRankingGame() {
+    if (widget.selectedFilter?.gameType == GameType.ranking) {
+      // 케이팝 데몬 헌터스 필터인 경우
+      if (widget.selectedFilter?.id == 'kpop_demon_hunters') {
+        final characters = RankingDataService.getKpopDemonHuntersCharacters();
+        ref.read(rankingGameProvider.notifier).startGame('kpop_demon_hunters', characters);
+      }
+    }
   }
 
   @override
@@ -70,13 +94,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
       return;
     }
 
-    // 2. 텍스처 이미지 백그라운드 로딩 시작 (비동기)
-    ForeheadRectangleService.loadTextureImage().catchError((e) {
-      if (kDebugMode) {
-        print('텍스처 이미지 백그라운드 로딩 실패: $e');
-      }
-      return null; // 에러 시 null 반환
-    });
+    // 2. 텍스처 이미지는 이제 동적으로 로딩되므로 미리 로딩하지 않음
 
     // 3. 카메라 초기화
     await _initializeCamera();
@@ -153,8 +171,16 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
         // 입술 랜드마크 처리
         lipLandmarks = LipTrackingService.extractLipLandmarks(firstFace);
         
-        // 이마 사각형 처리 (비동기) - controller 전달
-        foreheadRectangle = await ForeheadRectangleService.calculateForeheadRectangle(firstFace, controller);
+        // 현재 선택된 랭킹 아이템의 이미지 경로 가져오기
+        final currentRankingItem = ref.read(currentRankingItemProvider);
+        final imagePath = currentRankingItem?.imagePath;
+        
+        // 이마 사각형 처리 (비동기) - controller와 이미지 경로 전달
+        foreheadRectangle = await ForeheadRectangleService.calculateForeheadRectangle(
+          firstFace, 
+          controller, 
+          imagePath: imagePath,
+        );
         
         // 디버깅: 입술 정보를 120프레임마다 출력 (성능 영향 최소화)
         if (kDebugMode && _frameCount % 120 == 0) {
@@ -249,7 +275,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('게임 화면'),
+        title: Text(widget.selectedFilter?.name ?? '풍선 터뜨리기'),
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
         actions: [
@@ -443,24 +469,31 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
         // 얼굴 감지 오버레이
         if (_currentFaces.isNotEmpty)
           Positioned.fill(
-            child: FaceDetectionOverlay(
-              faces: _currentFaces,
-              lipLandmarks: _currentLipLandmarks, // T2C.2: 계산된 입술 랜드마크 전달
-              foreheadRectangle: _currentForeheadRectangle, // 이마 사각형 전달
-              previewSize: Size(
-                controller.value.previewSize!.height, // width에 height 값 (example code와 동일)
-                controller.value.previewSize!.width,  // height에 width 값 (example code와 동일)
-              ),
-              screenSize: Size(
-                MediaQuery.of(context).size.width,
-                MediaQuery.of(context).size.height,
-              ),
-              cameraController: controller,
+            child: Consumer(
+              builder: (context, ref, child) {
+                final currentRankingItem = ref.watch(currentRankingItemProvider);
+                return FaceDetectionOverlay(
+                  faces: _currentFaces,
+                  lipLandmarks: _currentLipLandmarks, // T2C.2: 계산된 입술 랜드마크 전달
+                  foreheadRectangle: _currentForeheadRectangle, // 이마 사각형 전달
+                  previewSize: Size(
+                    controller.value.previewSize!.height, // width에 height 값 (example code와 동일)
+                    controller.value.previewSize!.width,  // height에 width 값 (example code와 동일)
+                  ),
+                  screenSize: Size(
+                    MediaQuery.of(context).size.width,
+                    MediaQuery.of(context).size.height,
+                  ),
+                  cameraController: controller,
+                  selectedFilter: widget.selectedFilter, // 선택된 필터 전달
+                  currentRankingItem: currentRankingItem, // 현재 랭킹 아이템 전달
+                );
+              },
             ),
           ),
 
-        // 이마 사각형 상태 표시 오버레이 (우상단 상단)
-        if (_currentForeheadRectangle != null && _currentForeheadRectangle!.isValid)
+        // 이마 사각형 상태 표시 오버레이 (우상단 상단) - 디버깅 모드에서만 표시
+        if (_showDebugInfo && _currentForeheadRectangle != null && _currentForeheadRectangle!.isValid)
           Positioned(
             top: 50,
             right: 20,
@@ -519,8 +552,8 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
             ),
           ),
 
-        // T2C.3: 입술 거리 계산 결과 표시 오버레이 (우상단)
-        if (_currentLipLandmarks != null && _currentLipLandmarks!.isComplete)
+        // T2C.3: 입술 거리 계산 결과 표시 오버레이 (우상단) - 디버깅 모드에서만 표시
+        if (_showDebugInfo && _currentLipLandmarks != null && _currentLipLandmarks!.isComplete)
           Positioned(
             top: 180,
             right: 20,
@@ -612,8 +645,9 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
             ),
           ),
 
-        // 게임 오버레이 (나중에 Phase 3에서 추가)
-        Positioned(
+        // 게임 오버레이 (나중에 Phase 3에서 추가) - 디버깅 모드에서만 표시
+        if (_showDebugInfo)
+          Positioned(
           top: 20,
           left: 20,
           right: 20,
@@ -691,11 +725,21 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
           ),
         ),
 
-        // 성능 오버레이 (우상단)
-        const PositionedPerformanceOverlay(
-          position: PerformanceOverlayPosition.topRight,
-          showDetailed: false, // 간단 모드로 시작
-        ),
+        // 성능 오버레이 (우상단) - 디버깅 모드에서만 표시
+        if (_showDebugInfo)
+          const PositionedPerformanceOverlay(
+            position: PerformanceOverlayPosition.topRight,
+            showDetailed: false, // 간단 모드로 시작
+          ),
+
+        // 랭킹 슬롯 패널 (왼쪽) - 랭킹 게임일 때만 표시
+        if (widget.selectedFilter?.gameType == GameType.ranking)
+          const Positioned(
+            left: 0,
+            top: 0,
+            bottom: 0,
+            child: RankingSlotPanel(),
+          ),
 
         // 게임 시작 버튼 (임시)
         Positioned(

@@ -5,6 +5,8 @@ import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:camera/camera.dart';
 import '../services/lip_tracking_service.dart';
 import '../services/forehead_rectangle_service.dart';
+import '../models/ranking_item.dart';
+import '../models/filter_item.dart';
 
 /// 얼굴 감지 결과를 카메라 화면 위에 오버레이로 표시하는 위젯
 class FaceDetectionOverlay extends StatelessWidget {
@@ -14,6 +16,8 @@ class FaceDetectionOverlay extends StatelessWidget {
   final Size previewSize;
   final Size screenSize;
   final CameraController cameraController;
+  final FilterItem? selectedFilter; // 선택된 필터 정보
+  final RankingItem? currentRankingItem; // 현재 랭킹할 아이템
 
   const FaceDetectionOverlay({
     super.key,
@@ -23,6 +27,8 @@ class FaceDetectionOverlay extends StatelessWidget {
     required this.previewSize,
     required this.screenSize,
     required this.cameraController,
+    this.selectedFilter, // 선택된 필터 추가
+    this.currentRankingItem, // 현재 랭킹 아이템 추가
   });
 
   @override
@@ -35,6 +41,8 @@ class FaceDetectionOverlay extends StatelessWidget {
         previewSize: previewSize,
         screenSize: screenSize,
         cameraController: cameraController,
+        selectedFilter: selectedFilter, // 선택된 필터 전달
+        currentRankingItem: currentRankingItem, // 현재 랭킹 아이템 전달
       ),
       child: Container(),
     );
@@ -49,8 +57,13 @@ class FaceDetectionPainter extends CustomPainter {
   final Size previewSize;
   final Size screenSize;
   final CameraController cameraController;
+  final FilterItem? selectedFilter; // 선택된 필터 정보
+  final RankingItem? currentRankingItem; // 현재 랭킹할 아이템
 
   static bool _debugPrinted = false; // 디버깅용 플래그
+  
+  // 디버깅 표시 활성화 플래그 (개발 시에만 true로 설정)
+  static const bool _showDebugOverlay = false; // false로 설정하여 디버깅 표시 비활성화
 
   FaceDetectionPainter({
     required this.faces,
@@ -59,6 +72,8 @@ class FaceDetectionPainter extends CustomPainter {
     required this.previewSize,
     required this.screenSize,
     required this.cameraController,
+    this.selectedFilter, // 선택된 필터 추가
+    this.currentRankingItem, // 현재 랭킹 아이템 추가
   });
 
   @override
@@ -90,40 +105,43 @@ class FaceDetectionPainter extends CustomPainter {
         widgetSize: size,
       );
 
-      // 얼굴 bounding box 그리기
-      canvas.drawRect(rect, facePaint);
+      // 디버깅 표시가 활성화된 경우에만 그리기
+      if (_showDebugOverlay) {
+        // 얼굴 bounding box 그리기
+        canvas.drawRect(rect, facePaint);
 
-      // T2C.1 & T2C.2: 얼굴 랜드마크 그리기 (입술은 빨간색으로 구분)
-      _drawLandmarks(canvas, face, size);
+        // T2C.1 & T2C.2: 얼굴 랜드마크 그리기 (입술은 빨간색으로 구분)
+        _drawLandmarks(canvas, face, size);
+        
+        // T2C.2: 계산된 입술 중심점들 그리기 (노란색, 보라색으로 구분)
+        _drawLipCenterPoints(canvas, size);
+
+        // 얼굴 ID나 신뢰도가 있다면 텍스트로 표시
+        final textSpan = TextSpan(
+          text: 'Face',
+          style: textStyle,
+        );
+
+        final textPainter = TextPainter(
+          text: textSpan,
+          textDirection: TextDirection.ltr,
+        );
+
+        textPainter.layout();
+
+        // bounding box 상단에 텍스트 표시
+        textPainter.paint(
+          canvas,
+          Offset(rect.left, rect.top - textPainter.height - 4),
+        );
+      }
       
-      // T2C.2: 계산된 입술 중심점들 그리기 (노란색, 보라색으로 구분)
-      _drawLipCenterPoints(canvas, size);
-      
-      // 이마 사각형 그리기
+      // 이마 사각형은 항상 그리기 (핵심 기능)
       _drawForeheadRectangle(canvas, size);
-
-      // 얼굴 ID나 신뢰도가 있다면 텍스트로 표시
-      final textSpan = TextSpan(
-        text: 'Face',
-        style: textStyle,
-      );
-
-      final textPainter = TextPainter(
-        text: textSpan,
-        textDirection: TextDirection.ltr,
-      );
-
-      textPainter.layout();
-
-      // bounding box 상단에 텍스트 표시
-      textPainter.paint(
-        canvas,
-        Offset(rect.left, rect.top - textPainter.height - 4),
-      );
     }
 
-    // 전체 얼굴 개수 표시 (좌상단)
-    if (faces.isNotEmpty) {
+    // 디버깅 표시가 활성화된 경우에만 얼굴 개수 표시 (좌상단)
+    if (_showDebugOverlay && faces.isNotEmpty) {
       final countText = TextSpan(
         text: '감지된 얼굴: ${faces.length}개',
         style: TextStyle(
@@ -367,7 +385,8 @@ class FaceDetectionPainter extends CustomPainter {
       canvas.drawRect(drawRect, fillPaint);
     }
 
-    // 중심점 표시 제거 (더 깔끔한 효과)
+    // 랭킹 게임 모드일 때는 이미지가 이미 이마 사각형에 그려져 있으므로
+    // 추가 렌더링은 하지 않음 (텍스트 제거)
 
     // Canvas 복원
     canvas.restore();
@@ -380,9 +399,12 @@ class FaceDetectionPainter extends CustomPainter {
     }
   }
 
+
   @override
   bool shouldRepaint(FaceDetectionPainter oldDelegate) {
     return oldDelegate.faces != faces || 
-           oldDelegate.foreheadRectangle != foreheadRectangle;
+           oldDelegate.foreheadRectangle != foreheadRectangle ||
+           oldDelegate.currentRankingItem != currentRankingItem ||
+           oldDelegate.selectedFilter != selectedFilter;
   }
 }
