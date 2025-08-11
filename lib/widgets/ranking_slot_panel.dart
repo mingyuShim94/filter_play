@@ -14,70 +14,11 @@ class RankingSlotPanel extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final rankingSlots = ref.watch(rankingSlotsProvider);
-    final gameProgress = ref.watch(rankingGameProgressProvider);
-    
-    return Container(
+
+    return SizedBox(
       width: 120,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Colors.black.withValues(alpha: 0.8),
-            Colors.black.withValues(alpha: 0.6),
-          ],
-        ),
-      ),
       child: Column(
         children: [
-          // 헤더
-          Container(
-            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  Theme.of(context).primaryColor,
-                  Theme.of(context).primaryColor.withValues(alpha: 0.7),
-                ],
-              ),
-            ),
-            child: Column(
-              children: [
-                const Text(
-                  '랭킹',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '${(gameProgress * 10).toInt()}/10',
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          
-          // 진행률 바
-          Container(
-            height: 3,
-            margin: const EdgeInsets.symmetric(horizontal: 8),
-            child: LinearProgressIndicator(
-              value: gameProgress,
-              backgroundColor: Colors.white24,
-              valueColor: AlwaysStoppedAnimation<Color>(
-                Theme.of(context).primaryColor,
-              ),
-            ),
-          ),
-          
-          const SizedBox(height: 8),
-          
           // 랭킹 슬롯들
           Expanded(
             child: ListView.builder(
@@ -86,19 +27,25 @@ class RankingSlotPanel extends ConsumerWidget {
               itemBuilder: (context, index) {
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 6),
-                  child: RankingSlotWidget(
-                    rank: index + 1,
-                    item: rankingSlots[index],
-                    onTap: () {
-                      ref.read(rankingGameProvider.notifier).placeItemAtRank(index);
-                      onSlotTap?.call();
-                    },
-                    onLongPress: () {
-                      // 길게 누르면 아이템 제거 (재배치 기능)
-                      if (rankingSlots[index] != null) {
-                        ref.read(rankingGameProvider.notifier).removeItemFromRank(index);
-                      }
-                    },
+                  child: Center(
+                    child: RankingSlotWidget(
+                      rank: index + 1,
+                      item: rankingSlots[index],
+                      onTap: () {
+                        ref
+                            .read(rankingGameProvider.notifier)
+                            .placeItemAtRank(index);
+                        onSlotTap?.call();
+                      },
+                      onLongPress: () {
+                        // 길게 누르면 아이템 제거 (재배치 기능)
+                        if (rankingSlots[index] != null) {
+                          ref
+                              .read(rankingGameProvider.notifier)
+                              .removeItemFromRank(index);
+                        }
+                      },
+                    ),
                   ),
                 );
               },
@@ -127,132 +74,160 @@ class RankingSlotWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isEmpty = item == null;
-    final rankColor = _getRankColor(rank);
-    
+
     return GestureDetector(
       onTap: onTap,
       onLongPress: onLongPress,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        height: 50,
-        decoration: BoxDecoration(
-          gradient: isEmpty
-              ? LinearGradient(
-                  colors: [
-                    Colors.white.withValues(alpha: 0.1),
-                    Colors.white.withValues(alpha: 0.05),
-                  ],
-                )
-              : LinearGradient(
-                  colors: [
-                    rankColor.withValues(alpha: 0.8),
-                    rankColor.withValues(alpha: 0.6),
-                  ],
-                ),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: isEmpty 
-                ? Colors.white24 
-                : rankColor,
-            width: isEmpty ? 1 : 2,
+      child: isEmpty ? _buildEmptySlotLayout() : _buildSelectedSlotLayout(),
+    );
+  }
+
+  // 빈 슬롯 레이아웃 - 우측 정렬하여 선택된 슬롯과 이미지 위치 맞춤
+  Widget _buildEmptySlotLayout() {
+    
+    return SizedBox(
+      width: 97, // 36(숫자) + 7(간격) + 54(이미지)와 동일 (10% 축소)
+      height: 54,
+      child: Align(
+        alignment: Alignment.centerRight,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
+          width: 54,
+          height: 54,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                Colors.white.withValues(alpha: 0.3),
+                Colors.white.withValues(alpha: 0.2),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(15),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.5),
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.3),
+                blurRadius: 2,
+                offset: const Offset(0, 1),
+              ),
+            ],
           ),
-          boxShadow: isEmpty
-              ? null
-              : [
-                  BoxShadow(
-                    color: rankColor.withValues(alpha: 0.3),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-        ),
-        child: Row(
-          children: [
-            // 순위 번호
-            Container(
-              width: 30,
-              alignment: Alignment.center,
-              child: Text(
-                '$rank',
-                style: TextStyle(
-                  color: isEmpty ? Colors.white60 : Colors.white,
-                  fontSize: 14,
-                  fontWeight: isEmpty ? FontWeight.normal : FontWeight.bold,
-                ),
+          child: Center(
+            child: Text(
+              '$rank',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.9),
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
               ),
             ),
-            
-            // 구분선
-            Container(
-              width: 1,
-              height: 30,
-              color: isEmpty ? Colors.white24 : Colors.white30,
-            ),
-            
-            // 아이템 영역
-            Expanded(
-              child: Container(
-                alignment: Alignment.center,
-                child: isEmpty
-                    ? Icon(
-                        Icons.add,
-                        color: Colors.white30,
-                        size: 20,
-                      )
-                    : Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          // 이미지 표시 (이모지 대신)
-                          item!.imagePath != null
-                              ? ClipRRect(
-                                  borderRadius: BorderRadius.circular(4),
-                                  child: Image.asset(
-                                    item!.imagePath!,
-                                    width: 24,
-                                    height: 24,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (context, error, stackTrace) {
-                                      return Container(
-                                        width: 24,
-                                        height: 24,
-                                        color: Colors.white24,
-                                        child: const Icon(
-                                          Icons.person,
-                                          size: 16,
-                                          color: Colors.white60,
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                )
-                              : Container(
-                                  width: 24,
-                                  height: 24,
-                                  color: Colors.white24,
-                                  child: const Icon(
-                                    Icons.person,
-                                    size: 16,
-                                    color: Colors.white60,
-                                  ),
-                                ),
-                          const SizedBox(height: 2),
-                          Text(
-                            item!.name,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 8,
-                              fontWeight: FontWeight.w500,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                      ),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
+    );
+  }
+
+  // 선택된 슬롯 레이아웃 - Row로 숫자 영역과 이미지 영역 분리
+  Widget _buildSelectedSlotLayout() {
+    final rankColor = _getRankColor(rank);
+    
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // 랭킹 숫자 표시 영역
+        Container(
+          width: 36,
+          height: 54,
+          decoration: BoxDecoration(
+            color: rankColor,
+            borderRadius: BorderRadius.circular(15),
+            border: Border.all(
+              color: rankColor,
+              width: 2,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: rankColor.withValues(alpha: 0.3),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Center(
+            child: Text(
+              '$rank',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ),
+        
+        const SizedBox(width: 7),
+        
+        // 이미지 슬롯 영역
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
+          width: 54,
+          height: 54,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                rankColor.withValues(alpha: 0.8),
+                rankColor.withValues(alpha: 0.6),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(15),
+            border: Border.all(
+              color: rankColor,
+              width: 2,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: rankColor.withValues(alpha: 0.3),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: _buildSelectedSlot(),
+        ),
+      ],
+    );
+  }
+
+
+  // 선택된 슬롯 UI - 이미지만 표시 (숫자는 별도 영역에서 처리)
+  Widget _buildSelectedSlot() {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(13), // 컨테이너보다 살짝 작게
+      child: item!.imagePath != null
+          ? Image.asset(
+              item!.imagePath!,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) {
+                return Container(
+                  color: Colors.white24,
+                  child: const Icon(
+                    Icons.person,
+                    size: 32,
+                    color: Colors.white60,
+                  ),
+                );
+              },
+            )
+          : Container(
+              color: Colors.white24,
+              child: const Icon(
+                Icons.person,
+                size: 32,
+                color: Colors.white60,
+              ),
+            ),
     );
   }
 
@@ -310,7 +285,7 @@ class RankMedalWidget extends StatelessWidget {
           ),
         );
     }
-    
+
     return Text(
       emoji,
       style: TextStyle(fontSize: size),

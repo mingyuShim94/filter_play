@@ -60,14 +60,7 @@ class FilterListScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: Text(category.name),
-        leading: IconButton(
-          onPressed: () {
-            // 카테고리 선택 해제
-            ref.read(filterProvider.notifier).clearSelection();
-            Navigator.pop(context);
-          },
-          icon: const Icon(Icons.arrow_back),
-        ),
+        automaticallyImplyLeading: false,
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),

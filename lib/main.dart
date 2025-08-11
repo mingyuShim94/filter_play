@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'screens/home_screen.dart';
+import 'screens/filter_list_screen.dart';
+import 'services/filter_data_service.dart';
 
 void main() {
   runApp(
@@ -29,7 +30,9 @@ class FilterPlayApp extends StatelessWidget {
         ),
       ),
       debugShowCheckedModeBanner: false,
-      home: const HomeScreen(),
+      home: FilterListScreen(
+        category: FilterDataService.getCategoryById('ranking')!,
+      ),
     );
   }
 }

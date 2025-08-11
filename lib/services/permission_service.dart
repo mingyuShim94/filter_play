@@ -124,6 +124,7 @@ class PermissionService {
     return false;
   }
 
+
   // Android 버전 확인 (Android 13+ 체크)
   static Future<bool> _isAndroid13OrHigher() async {
     // 실제 구현에서는 device_info_plus 등을 사용할 수 있지만

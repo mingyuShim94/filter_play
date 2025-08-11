@@ -92,9 +92,9 @@ class ForeheadRectangle {
 /// 이마 위치 사각형 계산 및 관리 서비스
 class ForeheadRectangleService {
   // 이마 위치 계산을 위한 비율 상수들 (안정적인 위치)
-  static const double _foreheadYOffset = 0.35; // 눈 위로 얼굴 높이의 35% (더 안정적)
-  static const double _foreheadWidthRatio = 0.5; // 얼굴 너비의 50% (적절한 크기)
-  static const double _foreheadHeightRatio = 0.25; // 얼굴 높이의 25% (적절한 비율)
+  static const double _foreheadYOffset = 0.45; // 눈 위로 얼굴 높이의 45% (더 위쪽 위치, 눈 안가림)
+  static const double _foreheadWidthRatio = 0.25; // 얼굴 너비의 25% (더 작은 정사각형)
+  static const double _foreheadHeightRatio = 0.25; // 얼굴 높이의 25% (정사각형 비율 유지)
   
   // 이미지 캐싱 (다중 이미지 지원)
   static final Map<String, ui.Image> _cachedTextureImages = {};

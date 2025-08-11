@@ -26,7 +26,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Future<void> _selectCategory(FilterCategory category) async {
     // 카테고리 선택
     ref.read(filterProvider.notifier).selectCategory(category);
-    
+
     if (!category.isEnabled) {
       // 비활성화된 카테고리인 경우 준비중 다이얼로그 표시
       _showComingSoonDialog(category);
@@ -67,7 +67,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final permissionState = ref.watch(permissionProvider);
     final filterState = ref.watch(filterProvider);
     final cameraGranted = permissionState.cameraGranted;
-    
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('FilterPlay'),
@@ -110,29 +110,29 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  
+
                   // 타이틀
                   Text(
                     'FilterPlay',
                     style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                          fontWeight: FontWeight.bold,
+                        ),
                   ),
                   const SizedBox(height: 8),
-                  
+
                   // 설명
                   Text(
                     '다양한 필터 게임을 즐겨보세요!',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Colors.grey[600],
-                    ),
+                          color: Colors.grey[600],
+                        ),
                     textAlign: TextAlign.center,
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 32),
-            
+
             // 권한 상태 표시
             if (!cameraGranted)
               Container(
@@ -160,16 +160,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   ],
                 ),
               ),
-            
+
             // 카테고리 제목
             Text(
               '필터 카테고리',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+                    fontWeight: FontWeight.bold,
+                  ),
             ),
             const SizedBox(height: 16),
-            
+
             // 카테고리 그리드
             Expanded(
               child: filterState.isLoading
@@ -187,15 +187,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               const SizedBox(height: 16),
                               Text(
                                 '카테고리를 불러오는 중입니다',
-                                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                  color: Colors.grey[600],
-                                ),
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodyLarge
+                                    ?.copyWith(
+                                      color: Colors.grey[600],
+                                    ),
                               ),
                             ],
                           ),
                         )
                       : GridView.builder(
-                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                          gridDelegate:
+                              const SliverGridDelegateWithFixedCrossAxisCount(
                             crossAxisCount: 2,
                             crossAxisSpacing: 16,
                             mainAxisSpacing: 16,
@@ -279,35 +283,35 @@ class _CategoryCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 12),
-              
+
               // 카테고리 이름
               Text(
                 category.name,
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: category.isEnabled
-                      ? Colors.black87
-                      : Colors.grey[600],
-                ),
+                      fontWeight: FontWeight.bold,
+                      color: category.isEnabled
+                          ? Colors.black87
+                          : Colors.grey[600],
+                    ),
                 textAlign: TextAlign.center,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
               const SizedBox(height: 4),
-              
+
               // 카테고리 설명
               Text(
                 category.description,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: category.isEnabled
-                      ? Colors.grey[700]
-                      : Colors.grey[500],
-                ),
+                      color: category.isEnabled
+                          ? Colors.grey[700]
+                          : Colors.grey[500],
+                    ),
                 textAlign: TextAlign.center,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
-              
+
               // 상태 표시
               const SizedBox(height: 8),
               if (category.isEnabled)
@@ -324,9 +328,9 @@ class _CategoryCard extends StatelessWidget {
                   child: Text(
                     '사용가능',
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: Colors.green[700],
-                      fontWeight: FontWeight.bold,
-                    ),
+                          color: Colors.green[700],
+                          fontWeight: FontWeight.bold,
+                        ),
                   ),
                 )
               else
@@ -343,9 +347,9 @@ class _CategoryCard extends StatelessWidget {
                   child: Text(
                     '준비중',
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: Colors.orange[700],
-                      fontWeight: FontWeight.bold,
-                    ),
+                          color: Colors.orange[700],
+                          fontWeight: FontWeight.bold,
+                        ),
                   ),
                 ),
             ],
