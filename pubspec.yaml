@@ -41,13 +41,6 @@ dependencies:
   # State Management
   flutter_riverpod: ^2.6.1
 
-  # Video Recording, Playback & Sharing
-  path_provider: ^2.1.2
-  path: ^1.8.3
-  video_player: ^2.8.2
-  gal: ^2.3.2
-  share_plus: ^11.1.0
-  flutter_screen_recording: ^2.0.24
 
   # Permissions
   permission_handler: ^12.0.1

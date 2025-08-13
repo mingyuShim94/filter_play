@@ -76,3 +76,4 @@ The app uses a phased approach for ML Kit configuration:
 - Debug features controlled by `_showDebugInfo` flag in CameraScreen
 - Extensive Korean language UI text
 - Performance monitoring built-in for ML Kit optimization
+- 빌드해서 정상작동확인하려고 flutter build apk --debug 하는건 나한테 시키고 너가 하지마라. 내가 하는게 빠르다.

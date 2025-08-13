@@ -1,12 +1,7 @@
-import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:camera/camera.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:path/path.dart' as path;
-import 'package:video_player/video_player.dart';
-import 'package:gal/gal.dart';
 import '../providers/camera_provider.dart';
 import '../providers/ranking_game_provider.dart';
 import '../services/permission_service.dart';
@@ -33,7 +28,7 @@ class CameraScreen extends ConsumerStatefulWidget {
   ConsumerState<CameraScreen> createState() => _CameraScreenState();
 }
 
-class _CameraScreenState extends ConsumerState<CameraScreen> with TickerProviderStateMixin {
+class _CameraScreenState extends ConsumerState<CameraScreen> {
   // 디버깅 표시 활성화 플래그 (개발 시에만 true로 설정)
   static const bool _showDebugInfo = false; // false로 설정하여 디버깅 표시 비활성화
 
@@ -59,35 +54,10 @@ class _CameraScreenState extends ConsumerState<CameraScreen> with TickerProvider
   // 얼굴 감지 처리 중 플래그 (중복 처리 방지)
   bool _isProcessingFrame = false;
 
-  // 녹화 상태 관리
-  bool _isRecording = false;
-  String? _videoPath;
-  late AnimationController _recordingIndicatorController;
-  late AnimationController _recordButtonController;
-  late Animation<double> _recordButtonAnimation;
 
   @override
   void initState() {
     super.initState();
-    
-    // 녹화 관련 애니메이션 컨트롤러 초기화
-    _recordingIndicatorController = AnimationController(
-      duration: const Duration(milliseconds: 1000),
-      vsync: this,
-    )..repeat(reverse: true);
-    
-    _recordButtonController = AnimationController(
-      duration: const Duration(milliseconds: 300),
-      vsync: this,
-    );
-    
-    _recordButtonAnimation = Tween<double>(
-      begin: 1.0,
-      end: 0.8,
-    ).animate(CurvedAnimation(
-      parent: _recordButtonController,
-      curve: Curves.easeInOut,
-    ));
     
     // 화면 로드 후 초기화
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -111,15 +81,6 @@ class _CameraScreenState extends ConsumerState<CameraScreen> with TickerProvider
 
   @override
   void dispose() {
-    // 녹화 중이면 중지
-    if (_isRecording) {
-      _stopRecording();
-    }
-    
-    // 애니메이션 컨트롤러들 정리
-    _recordingIndicatorController.dispose();
-    _recordButtonController.dispose();
-    
     // 화면 종료 시 리소스 정리
     // ref.read는 dispose에서 사용할 수 없으므로 직접 서비스 호출
     FaceDetectionService.dispose();
@@ -808,103 +769,6 @@ class _CameraScreenState extends ConsumerState<CameraScreen> with TickerProvider
             child: RankingSlotPanel(),
           ),
 
-        // 녹화 중 상태 인디케이터 (우상단)
-        if (_isRecording)
-          Positioned(
-            top: MediaQuery.of(context).padding.top + 16,
-            right: 16,
-            child: AnimatedBuilder(
-              animation: _recordingIndicatorController,
-              builder: (context, child) {
-                return Opacity(
-                  opacity: _recordingIndicatorController.value * 0.5 + 0.5,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.7),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.red, width: 1),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 8,
-                          height: 8,
-                          decoration: const BoxDecoration(
-                            color: Colors.red,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        const Text(
-                          'REC',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-
-        // 녹화 버튼 (중앙 하단)
-        Positioned(
-          bottom: 30,
-          left: 0,
-          right: 0,
-          child: Center(
-            child: AnimatedBuilder(
-              animation: _recordButtonAnimation,
-              builder: (context, child) {
-                return Transform.scale(
-                  scale: _recordButtonAnimation.value,
-                  child: Container(
-                    width: 80,
-                    height: 80,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: _isRecording ? Colors.red : Colors.red,
-                      border: Border.all(
-                        color: Colors.white,
-                        width: 3,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.3),
-                          blurRadius: 10,
-                          spreadRadius: 2,
-                        ),
-                        // 녹화 중일 때 빨간색 글로우 효과
-                        if (_isRecording)
-                          BoxShadow(
-                            color: Colors.red.withValues(alpha: 0.5),
-                            blurRadius: 20,
-                            spreadRadius: 5,
-                          ),
-                      ],
-                    ),
-                    child: IconButton(
-                      onPressed: isInitialized && !isLoading ? _toggleRecording : null,
-                      icon: Icon(
-                        _isRecording 
-                          ? Icons.stop
-                          : Icons.fiber_manual_record,
-                        color: Colors.white,
-                        size: 30,
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-        ),
 
       ],
     );
@@ -953,257 +817,6 @@ class _CameraScreenState extends ConsumerState<CameraScreen> with TickerProvider
     }
   }
 
-  // 녹화 시작
-  Future<void> _startRecording() async {
-    final controller = ref.read(cameraProvider).controller;
-    if (controller == null || !controller.value.isInitialized) {
-      if (kDebugMode) print('카메라가 초기화되지 않았습니다.');
-      return;
-    }
-
-    if (_isRecording) {
-      if (kDebugMode) print('이미 녹화 중입니다.');
-      return;
-    }
-
-    try {
-      final directory = await getApplicationDocumentsDirectory();
-      final String fileName =
-          'filterplay_video_${DateTime.now().millisecondsSinceEpoch}.mp4';
-      _videoPath = path.join(directory.path, fileName);
-
-      await controller.startVideoRecording();
-      _recordButtonController.forward();
-
-      setState(() {
-        _isRecording = true;
-      });
-
-      if (kDebugMode) print('녹화 시작: $_videoPath');
-    } catch (e) {
-      if (kDebugMode) print('녹화 시작 실패: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('녹화 시작에 실패했습니다: $e')),
-        );
-      }
-    }
-  }
-
-  // 녹화 중지
-  Future<void> _stopRecording() async {
-    final controller = ref.read(cameraProvider).controller;
-    if (!_isRecording || controller == null) return;
-
-    try {
-      final XFile video = await controller.stopVideoRecording();
-      _recordButtonController.reverse();
-
-      setState(() {
-        _isRecording = false;
-        _videoPath = video.path;
-      });
-
-      if (kDebugMode) print('녹화 완료: ${video.path}');
-      
-      // 녹화 완료 후 미리보기 다이얼로그 표시
-      if (mounted) {
-        _showVideoPreviewDialog();
-      }
-    } catch (e) {
-      if (kDebugMode) print('녹화 중지 실패: $e');
-      setState(() {
-        _isRecording = false;
-      });
-      _recordButtonController.reverse();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('녹화 중지에 실패했습니다: $e')),
-        );
-      }
-    }
-  }
-
-  // 녹화 토글
-  Future<void> _toggleRecording() async {
-    if (_isRecording) {
-      await _stopRecording();
-    } else {
-      await _startRecording();
-    }
-  }
-
-  // 녹화된 비디오 미리보기 다이얼로그
-  void _showVideoPreviewDialog() {
-    if (_videoPath == null) return;
-    
-    showDialog(
-      context: context,
-      builder: (context) => VideoPreviewDialog(videoPath: _videoPath!),
-    );
-  }
 
 }
 
-// 비디오 미리보기 다이얼로그 위젯
-class VideoPreviewDialog extends StatefulWidget {
-  final String videoPath;
-
-  const VideoPreviewDialog({
-    super.key,
-    required this.videoPath,
-  });
-
-  @override
-  State<VideoPreviewDialog> createState() => _VideoPreviewDialogState();
-}
-
-class _VideoPreviewDialogState extends State<VideoPreviewDialog> {
-  late VideoPlayerController _controller;
-  bool _isPlaying = false;
-  bool _isLoading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = VideoPlayerController.file(File(widget.videoPath))
-      ..initialize().then((_) {
-        setState(() {
-          _isLoading = false;
-        });
-        _controller.play();
-        setState(() {
-          _isPlaying = true;
-        });
-      });
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  // 갤러리에 저장
-  Future<void> _saveToGallery() async {
-    try {
-      await Gal.putVideo(widget.videoPath);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('갤러리에 저장되었습니다')),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('저장 중 오류가 발생했습니다: $e')),
-        );
-      }
-    }
-  }
-
-  // 비디오 재생/일시정지 토글
-  void _togglePlayback() {
-    if (_controller.value.isInitialized) {
-      setState(() {
-        if (_isPlaying) {
-          _controller.pause();
-          _isPlaying = false;
-        } else {
-          _controller.play();
-          _isPlaying = true;
-        }
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Dialog(
-      backgroundColor: Colors.black,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // 제목
-            const Text(
-              '녹화된 비디오',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16),
-            
-            // 비디오 플레이어
-            Container(
-              height: 300,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(8),
-                color: Colors.grey[900],
-              ),
-              child: _isLoading
-                  ? const Center(
-                      child: CircularProgressIndicator(color: Colors.white),
-                    )
-                  : ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          AspectRatio(
-                            aspectRatio: _controller.value.aspectRatio,
-                            child: VideoPlayer(_controller),
-                          ),
-                          // 재생/일시정지 버튼
-                          IconButton(
-                            onPressed: _togglePlayback,
-                            icon: Icon(
-                              _isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled,
-                              size: 60,
-                              color: Colors.white.withValues(alpha: 0.8),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-            ),
-            const SizedBox(height: 16),
-            
-            // 액션 버튼들
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: _saveToGallery,
-                    icon: const Icon(Icons.save_alt),
-                    label: const Text('갤러리에 저장'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: TextButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: const Text(
-                      '닫기',
-                      style: TextStyle(color: Colors.white),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
