@@ -6,7 +6,7 @@ import 'package:camera/camera.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
 import 'package:video_player/video_player.dart';
-import 'package:image_gallery_saver/image_gallery_saver.dart';
+import 'package:gal/gal.dart';
 import '../providers/camera_provider.dart';
 import '../providers/ranking_game_provider.dart';
 import '../services/permission_service.dart';
@@ -1087,17 +1087,11 @@ class _VideoPreviewDialogState extends State<VideoPreviewDialog> {
   // 갤러리에 저장
   Future<void> _saveToGallery() async {
     try {
-      final result = await ImageGallerySaver.saveFile(widget.videoPath);
+      await Gal.putVideo(widget.videoPath);
       if (mounted) {
-        if (result['isSuccess']) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('갤러리에 저장되었습니다')),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('저장에 실패했습니다')),
-          );
-        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('갤러리에 저장되었습니다')),
+        );
       }
     } catch (e) {
       if (mounted) {
