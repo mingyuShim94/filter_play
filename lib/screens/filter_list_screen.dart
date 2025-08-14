@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/filter_category.dart';
 import '../models/filter_item.dart';
 import '../providers/filter_provider.dart';
-import 'camera_screen.dart';
+import 'ranking_filter_screen.dart';
 
 class FilterListScreen extends ConsumerWidget {
   final FilterCategory category;
@@ -29,7 +29,7 @@ class FilterListScreen extends ConsumerWidget {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => CameraScreen(selectedFilter: filter),
+          builder: (context) => const RankingFilterScreen(),
         ),
       );
     }
