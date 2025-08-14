@@ -65,7 +65,9 @@ class _RankingFilterScreenState extends State<RankingFilterScreen> {
       appBar: AppBar(
         title: const Text('Ranking Filter'),
       ),
-      body: CameraPreview(controller),
+      body: SizedBox.expand(
+        child: CameraPreview(controller),
+      ),
     );
   }
 }
