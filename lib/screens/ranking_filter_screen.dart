@@ -1,13 +1,16 @@
 import 'dart:io';
 import 'dart:math';
+import 'dart:ui' as ui;
 
 import 'package:camera/camera.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:path_provider/path_provider.dart';
 import '../services/forehead_rectangle_service.dart';
 import '../providers/ranking_game_provider.dart';
 import '../services/ranking_data_service.dart';
@@ -23,6 +26,9 @@ class RankingFilterScreen extends ConsumerStatefulWidget {
 }
 
 class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
+  // RepaintBoundary를 참조하기 위한 GlobalKey
+  final GlobalKey _captureKey = GlobalKey();
+  
   CameraController? _controller;
   Future<void>? _initializeControllerFuture;
   final FaceDetector _faceDetector = FaceDetector(
@@ -227,6 +233,50 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
     return allBytes.done().buffer.asUint8List();
   }
 
+  // 프레임 캡처 함수
+  Future<void> _captureFrame() async {
+    try {
+      RenderRepaintBoundary boundary = _captureKey.currentContext!
+          .findRenderObject() as RenderRepaintBoundary;
+
+      ui.Image image = await boundary.toImage(pixelRatio: 1.0);
+      ByteData? byteData =
+          await image.toByteData(format: ui.ImageByteFormat.png);
+
+      if (byteData != null) {
+        Uint8List pngBytes = byteData.buffer.asUint8List();
+
+        // 저장할 디렉토리 가져오기
+        final directory = await getApplicationDocumentsDirectory();
+        final fileName = 'capture_${DateTime.now().millisecondsSinceEpoch}.png';
+        final file = File('${directory.path}/$fileName');
+
+        await file.writeAsBytes(pngBytes);
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('화면이 캡처되었습니다: $fileName'),
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+        
+        print('캡처 완료: ${file.path}');
+      }
+    } catch (e) {
+      print('캡처 오류: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('캡처 실패: $e'),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -249,9 +299,11 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
                 if (snapshot.connectionState == ConnectionState.done &&
                     _controller != null &&
                     _controller!.value.isInitialized) {
-                  return Stack(
-                    fit: StackFit.expand,
-                    children: [
+                  return RepaintBoundary(
+                    key: _captureKey,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
                       CameraPreview(_controller!),
                       // 이마 이미지 오버레이 (얼굴이 감지되고 이마 사각형이 있을 때만)
                       if (_currentForeheadRectangle != null && _currentForeheadRectangle!.isValid)
@@ -276,6 +328,7 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
                         child: RankingSlotPanel(),
                       ),
                     ],
+                  ),
                   );
                 } else if (snapshot.hasError) {
                   return Center(child: Text('Error'));
@@ -288,6 +341,11 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
                 }
               },
             ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _captureFrame,
+        tooltip: '화면 캡처',
+        child: const Icon(Icons.camera_alt),
+      ),
     );
   }
 }
