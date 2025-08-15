@@ -5,20 +5,24 @@ import 'package:camera/camera.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../services/forehead_rectangle_service.dart';
+import '../providers/ranking_game_provider.dart';
+import '../services/ranking_data_service.dart';
+import '../widgets/ranking_slot_panel.dart';
 
 /// RankingFilterScreen is a ranking filter page.
-class RankingFilterScreen extends StatefulWidget {
+class RankingFilterScreen extends ConsumerStatefulWidget {
   /// Default Constructor
   const RankingFilterScreen({super.key});
 
   @override
-  State<RankingFilterScreen> createState() => _RankingFilterScreenState();
+  ConsumerState<RankingFilterScreen> createState() => _RankingFilterScreenState();
 }
 
-class _RankingFilterScreenState extends State<RankingFilterScreen> {
+class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
   CameraController? _controller;
   Future<void>? _initializeControllerFuture;
   final FaceDetector _faceDetector = FaceDetector(
@@ -38,14 +42,24 @@ class _RankingFilterScreenState extends State<RankingFilterScreen> {
   // 이마 사각형 관련 상태 변수
   ForeheadRectangle? _currentForeheadRectangle;
   
-  // 테스트용 고정 이미지 경로
-  static const String _testImagePath = 'assets/images/ranking/kpop_demon_hunters/abby.png';
 
   @override
   void initState() {
     super.initState();
     _requestPermissions();
     _initializeCameras();
+    
+    // 위젯 트리 빌드 완료 후 랭킹 게임 초기화
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeRankingGame();
+    });
+  }
+
+  // 랭킹 게임 초기화
+  void _initializeRankingGame() {
+    // K-pop 데몬 헌터스 랭킹 게임 시작
+    final characters = RankingDataService.getKpopDemonHuntersCharacters();
+    ref.read(rankingGameProvider.notifier).startGame('kpop_demon_hunters', characters);
   }
 
   @override
@@ -152,10 +166,15 @@ class _RankingFilterScreenState extends State<RankingFilterScreen> {
         ForeheadRectangle? foreheadRectangle;
         if (faces.isNotEmpty) {
           final firstFace = faces.first;
+          
+          // 현재 선택된 랭킹 아이템의 이미지 경로 가져오기
+          final currentRankingItem = ref.read(currentRankingItemProvider);
+          final imagePath = currentRankingItem?.imagePath;
+          
           foreheadRectangle = await ForeheadRectangleService.calculateForeheadRectangle(
             firstFace,
             _controller!,
-            imagePath: _testImagePath,
+            imagePath: imagePath,
           );
         }
 
@@ -249,6 +268,13 @@ class _RankingFilterScreenState extends State<RankingFilterScreen> {
                             ),
                           ),
                         ),
+                      // 랭킹 슬롯 패널 (왼쪽)
+                      const Positioned(
+                        left: 0,
+                        top: 0,
+                        bottom: 0,
+                        child: RankingSlotPanel(),
+                      ),
                     ],
                   );
                 } else if (snapshot.hasError) {

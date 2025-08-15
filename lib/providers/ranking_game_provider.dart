@@ -72,9 +72,9 @@ class RankingGameNotifier extends StateNotifier<RankingGameState> {
 
     // 제거된 아이템을 남은 아이템 목록에 추가
     final newRemainingItems = List<RankingItem>.from(state.remainingItems);
-    
+
     RankingItem? newCurrentItem = state.currentItem;
-    
+
     // 현재 아이템이 없다면 제거된 아이템을 현재 아이템으로 설정
     if (newCurrentItem == null) {
       newCurrentItem = removedItem;
@@ -113,7 +113,8 @@ class RankingGameNotifier extends StateNotifier<RankingGameState> {
   void printGameState() {
     print('=== Ranking Game State ===');
     print('Status: ${state.status}');
-    print('Current Item: ${state.currentItem?.name} ${state.currentItem?.emoji}');
+    print(
+        'Current Item: ${state.currentItem?.name} ${state.currentItem?.emoji}');
     print('Remaining Items: ${state.remainingItems.length}');
     print('Filled Slots: ${state.filledSlots}/10');
     for (int i = 0; i < state.rankingSlots.length; i++) {
@@ -125,7 +126,8 @@ class RankingGameNotifier extends StateNotifier<RankingGameState> {
 }
 
 // Provider 인스턴스
-final rankingGameProvider = StateNotifierProvider<RankingGameNotifier, RankingGameState>((ref) {
+final rankingGameProvider =
+    StateNotifierProvider<RankingGameNotifier, RankingGameState>((ref) {
   return RankingGameNotifier();
 });
 
