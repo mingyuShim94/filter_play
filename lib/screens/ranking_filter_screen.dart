@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math';
 
 import 'package:camera/camera.dart';
 import 'package:flutter/cupertino.dart';
@@ -6,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:permission_handler/permission_handler.dart';
+import '../services/forehead_rectangle_service.dart';
 
 /// RankingFilterScreen is a ranking filter page.
 class RankingFilterScreen extends StatefulWidget {
@@ -21,9 +23,9 @@ class _RankingFilterScreenState extends State<RankingFilterScreen> {
   Future<void>? _initializeControllerFuture;
   final FaceDetector _faceDetector = FaceDetector(
     options: FaceDetectorOptions(
-      enableClassification: true,
-      enableLandmarks: true,
-      enableTracking: true,
+      enableClassification: false,  // 웃음 확률 등 불필요하므로 비활성화
+      enableLandmarks: true,        // 이마 계산에 필요한 눈, 코 랜드마크 활성화
+      enableTracking: false,        // 추적 불필요하므로 비활성화
       performanceMode: FaceDetectorMode.fast,
     ),
   );
@@ -32,6 +34,12 @@ class _RankingFilterScreenState extends State<RankingFilterScreen> {
   List<Face> _faces = [];
   List<CameraDescription> cameras = [];
   int _selectedCameraIndex = 0;
+  
+  // 이마 사각형 관련 상태 변수
+  ForeheadRectangle? _currentForeheadRectangle;
+  
+  // 테스트용 고정 이미지 경로
+  static const String _testImagePath = 'assets/images/ranking/kpop_demon_hunters/abby.png';
 
   @override
   void initState() {
@@ -44,6 +52,8 @@ class _RankingFilterScreenState extends State<RankingFilterScreen> {
   void dispose() {
     _controller?.dispose();
     _faceDetector.close();
+    // 이마 이미지 리소스 정리
+    ForeheadRectangleService.disposeTextureImage();
     super.dispose();
   }
 
@@ -113,6 +123,7 @@ class _RankingFilterScreenState extends State<RankingFilterScreen> {
 
     setState(() {
       _faces = [];
+      _currentForeheadRectangle = null;
     });
 
     await _initializeCamera(cameras[_selectedCameraIndex]);
@@ -137,9 +148,21 @@ class _RankingFilterScreenState extends State<RankingFilterScreen> {
       try {
         final List<Face> faces = await _faceDetector.processImage(inputImage);
 
+        // 이마 사각형 계산 (첫 번째 얼굴에 대해서만)
+        ForeheadRectangle? foreheadRectangle;
+        if (faces.isNotEmpty) {
+          final firstFace = faces.first;
+          foreheadRectangle = await ForeheadRectangleService.calculateForeheadRectangle(
+            firstFace,
+            _controller!,
+            imagePath: _testImagePath,
+          );
+        }
+
         if (mounted) {
           setState(() {
             _faces = faces;
+            _currentForeheadRectangle = foreheadRectangle;
           });
         }
       } catch (e) {
@@ -211,42 +234,21 @@ class _RankingFilterScreenState extends State<RankingFilterScreen> {
                     fit: StackFit.expand,
                     children: [
                       CameraPreview(_controller!),
-                      CustomPaint(
-                        painter: FaceDetectionPainter(
-                          faces: _faces,
-                          imageSize: Size(
-                            _controller!.value.previewSize!.height,
-                            _controller!.value.previewSize!.width,
-                          ),
-                          cameraLensDirection:
-                              _controller!.description.lensDirection,
-                        ),
-                      ),
-                      Positioned(
-                        bottom: 20,
-                        left: 0,
-                        right: 0,
-                        child: Center(
-                          child: Container(
-                            padding: EdgeInsets.symmetric(
-                              vertical: 8,
-                              horizontal: 16,
+                      // 이마 이미지 오버레이 (얼굴이 감지되고 이마 사각형이 있을 때만)
+                      if (_currentForeheadRectangle != null && _currentForeheadRectangle!.isValid)
+                        CustomPaint(
+                          painter: ForeheadImagePainter(
+                            foreheadRectangle: _currentForeheadRectangle!,
+                            imageSize: Size(
+                              _controller!.value.previewSize!.height,
+                              _controller!.value.previewSize!.width,
                             ),
-                            decoration: BoxDecoration(
-                              color: Colors.black54,
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Text(
-                              'Faces detected: ${_faces.length}',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
+                            screenSize: Size(
+                              MediaQuery.of(context).size.width,
+                              MediaQuery.of(context).size.height,
                             ),
                           ),
                         ),
-                      ),
                     ],
                   );
                 } else if (snapshot.hasError) {
@@ -264,120 +266,101 @@ class _RankingFilterScreenState extends State<RankingFilterScreen> {
   }
 }
 
-class FaceDetectionPainter extends CustomPainter {
-  final List<Face> faces;
+/// 이마 영역에 이미지를 표시하는 전용 CustomPainter
+class ForeheadImagePainter extends CustomPainter {
+  final ForeheadRectangle foreheadRectangle;
   final Size imageSize;
-  final CameraLensDirection cameraLensDirection;
+  final Size screenSize;
 
-  FaceDetectionPainter({
+  ForeheadImagePainter({
     super.repaint,
-    required this.faces,
+    required this.foreheadRectangle,
     required this.imageSize,
-    required this.cameraLensDirection,
+    required this.screenSize,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
+    // 이마 사각형이 유효하지 않으면 아무것도 그리지 않음
+    if (!foreheadRectangle.isValid) return;
+
+    // 화면과 이미지 크기 비율 계산
     final double scaleX = size.width / imageSize.width;
     final double scaleY = size.height / imageSize.height;
 
-    final Paint facePaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3.0
-      ..color = Colors.green;
+    final rect = foreheadRectangle;
+    
+    // 화면 좌표로 변환된 중심점
+    final centerX = rect.center.x * scaleX;
+    final centerY = rect.center.y * scaleY;
+    
+    // 스케일이 적용된 사각형 크기
+    final scaledWidth = rect.width * rect.scale * scaleX;
+    final scaledHeight = rect.height * rect.scale * scaleY;
 
-    final Paint landmarkPaint = Paint()
-      ..style = PaintingStyle.fill
-      ..strokeWidth = 3.0
-      ..color = Colors.blue;
+    // Canvas 저장
+    canvas.save();
 
-    final Paint textBackgroundPaint = Paint()
-      ..style = PaintingStyle.fill
-      ..color = Colors.black54;
+    // 중심점으로 이동
+    canvas.translate(centerX, centerY);
 
-    for (var i = 0; i < faces.length; i++) {
-      final Face face = faces[i];
+    // Z축 회전 (기울기) 적용 - 방향 반전으로 얼굴 기울기와 일치
+    canvas.rotate(-rect.rotationZ * pi / 180);
 
-      double leftOffset = face.boundingBox.left;
-      if (cameraLensDirection == CameraLensDirection.front) {
-        leftOffset = imageSize.width - face.boundingBox.right;
-      }
+    // Y축 회전을 원근감으로 표현 (스케일 변형)
+    final perspectiveScale = cos(rect.rotationY * pi / 180).abs();
+    final skewX = sin(rect.rotationY * pi / 180) * 0.3;
+    
+    // 변형 행렬 적용 (원근감)
+    final transform = Matrix4.identity()
+      ..setEntry(0, 0, perspectiveScale) // X축 스케일
+      ..setEntry(0, 1, skewX); // X축 기울기 (원근감)
+    
+    canvas.transform(transform.storage);
 
-      final double left = leftOffset * scaleX;
-      final double top = face.boundingBox.top * scaleY;
-      final double right = (leftOffset + face.boundingBox.width) * scaleX;
-      final double bottom =
-          (face.boundingBox.top + face.boundingBox.height) * scaleY;
+    // 사각형 그리기 (중심 기준)
+    final drawRect = Rect.fromCenter(
+      center: Offset.zero,
+      width: scaledWidth,
+      height: scaledHeight,
+    );
 
-      canvas.drawRect(Rect.fromLTRB(left, top, right, bottom), facePaint);
-
-      void drawLandmark(FaceLandmarkType type) {
-        if (face.landmarks[type] != null) {
-          final point = face.landmarks[type]!.position;
-          double pointX = point.x.toDouble();
-          if (cameraLensDirection == CameraLensDirection.front) {
-            pointX = imageSize.width - pointX;
-          }
-          canvas.drawCircle(
-            Offset(pointX * scaleX, point.y * scaleY),
-            4.0,
-            landmarkPaint,
-          );
-        }
-      }
-
-      drawLandmark(FaceLandmarkType.leftEye);
-      drawLandmark(FaceLandmarkType.rightEye);
-      drawLandmark(FaceLandmarkType.noseBase);
-      drawLandmark(FaceLandmarkType.leftMouth);
-      drawLandmark(FaceLandmarkType.rightMouth);
-      drawLandmark(FaceLandmarkType.bottomMouth);
-
-      String mood = 'Neutral';
-      final smileProb = face.smilingProbability ?? 0;
-      if (smileProb > 0.8) {
-        mood = 'Laughing 😅';
-      } else if (smileProb > 0.5) {
-        mood = 'Smiling 🙂';
-      } else if (smileProb < 0.1) {
-        mood = 'Serious 🙂';
-      }
-
-      final TextSpan faceIdSpan = TextSpan(
-        text: 'Face ${i + 1}\n$mood',
-        style: TextStyle(
-          color: Colors.white,
-          fontSize: 14,
-          fontWeight: FontWeight.bold,
-        ),
+    // 이미지가 있으면 이미지로 그리기
+    if (rect.textureImage != null) {
+      final srcRect = Rect.fromLTWH(
+        0, 0, 
+        rect.textureImage!.width.toDouble(), 
+        rect.textureImage!.height.toDouble()
       );
-
-      final TextPainter textPainter = TextPainter(
-        text: faceIdSpan,
-        textDirection: TextDirection.ltr,
-        textAlign: TextAlign.center,
-      );
-
-      textPainter.layout();
-
-      final textRect = Rect.fromLTWH(
-        left,
-        top - textPainter.height - 8,
-        textPainter.width + 16,
-        textPainter.height + 8,
-      );
-
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(textRect, Radius.circular(10)),
-        textBackgroundPaint,
-      );
-
-      textPainter.paint(canvas, Offset(left + 8, top - textPainter.height - 4));
+      
+      // 자연스러운 이미지 표시
+      final imagePaint = Paint()
+        ..color = Colors.white.withValues(alpha: 1.0)
+        ..filterQuality = FilterQuality.high;
+      
+      canvas.drawImageRect(rect.textureImage!, srcRect, drawRect, imagePaint);
+    } else {
+      // 이미지가 없는 경우 기본 사각형 (디버그용)
+      final rectPaint = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3.0
+        ..color = Colors.white.withValues(alpha: 0.8);
+      
+      canvas.drawRect(drawRect, rectPaint);
+      
+      // 내부 채우기
+      final fillPaint = Paint()
+        ..style = PaintingStyle.fill
+        ..color = Colors.white.withValues(alpha: 0.2);
+      canvas.drawRect(drawRect, fillPaint);
     }
+
+    // Canvas 복원
+    canvas.restore();
   }
 
   @override
-  bool shouldRepaint(FaceDetectionPainter oldDelegate) {
-    return oldDelegate.faces != faces;
+  bool shouldRepaint(ForeheadImagePainter oldDelegate) {
+    return oldDelegate.foreheadRectangle != foreheadRectangle;
   }
 }
