@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 import 'dart:ui' as ui;
@@ -48,6 +49,14 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
   // 이마 사각형 관련 상태 변수
   ForeheadRectangle? _currentForeheadRectangle;
   
+  // 녹화 관련 상태 변수들
+  bool _isRecording = false;
+  bool _isProcessing = false;
+  String _statusText = '녹화 준비됨';
+  Timer? _frameCaptureTimer;
+  Directory? _sessionDirectory;
+  int _frameCount = 0;
+  
 
   @override
   void initState() {
@@ -70,6 +79,10 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
 
   @override
   void dispose() {
+    // 타이머 확실히 정리
+    _frameCaptureTimer?.cancel();
+    _frameCaptureTimer = null;
+    
     _controller?.dispose();
     _faceDetector.close();
     // 이마 이미지 리소스 정리
@@ -233,7 +246,7 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
     return allBytes.done().buffer.asUint8List();
   }
 
-  // 프레임 캡처 함수
+  // 프레임 캡처 함수 (단일 캡처용)
   Future<void> _captureFrame() async {
     try {
       RenderRepaintBoundary boundary = _captureKey.currentContext!
@@ -274,6 +287,122 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
           ),
         );
       }
+    }
+  }
+
+  // 녹화 시작
+  Future<void> _startRecording() async {
+    setState(() {
+      _isRecording = true;
+      _statusText = '녹화 중...';
+      _frameCount = 0;
+    });
+
+    try {
+      // 임시 세션 디렉토리 생성
+      final tempDir = await getTemporaryDirectory();
+      _sessionDirectory = Directory(
+        '${tempDir.path}/record_${DateTime.now().millisecondsSinceEpoch}',
+      );
+      await _sessionDirectory!.create();
+
+      // 프레임 캡처 시작 (24fps)
+      _frameCaptureTimer = Timer.periodic(
+        Duration(milliseconds: (1000 / 24).round()),
+        (timer) => _captureFrameForRecording(),
+      );
+    } catch (e) {
+      setState(() {
+        _isRecording = false;
+        _statusText = '녹화 시작 실패: $e';
+      });
+    }
+  }
+
+  // 녹화용 프레임 캡처 (연속)
+  Future<void> _captureFrameForRecording() async {
+    // 위젯이 dispose된 상태에서는 실행하지 않음
+    if (!mounted) return;
+    
+    try {
+      RenderRepaintBoundary boundary = _captureKey.currentContext!
+          .findRenderObject() as RenderRepaintBoundary;
+
+      ui.Image image = await boundary.toImage(pixelRatio: 1.0);
+      ByteData? byteData =
+          await image.toByteData(format: ui.ImageByteFormat.png);
+
+      if (byteData != null) {
+        Uint8List pngBytes = byteData.buffer.asUint8List();
+
+        // 파일 이름을 숫자 패딩으로 생성 (FFmpeg에서 중요함)
+        final fileName =
+            'frame_${(_frameCount + 1).toString().padLeft(5, '0')}.png';
+        final file = File('${_sessionDirectory!.path}/$fileName');
+
+        await file.writeAsBytes(pngBytes);
+
+        // setState 호출 전 mounted 체크
+        if (mounted) {
+          setState(() {
+            _frameCount++;
+          });
+        }
+      }
+    } catch (e) {
+      print('프레임 캡처 오류: $e');
+    }
+  }
+
+  // 녹화 중지
+  Future<void> _stopRecording() async {
+    // 타이머 먼저 중지하여 추가 프레임 캡처 방지
+    _frameCaptureTimer?.cancel();
+    _frameCaptureTimer = null;
+    
+    if (mounted) {
+      setState(() {
+        _isRecording = false;
+        _isProcessing = true;
+        _statusText = '녹화 중지됨 - $_frameCount 프레임 저장됨';
+      });
+    }
+
+    try {
+      // 임시 파일 정리 (2단계에서는 삭제하지 않고 유지)
+      // await _cleanupTempFiles();
+      
+      if (mounted) {
+        setState(() {
+          _isProcessing = false;
+          _statusText = '녹화 완료 - $_frameCount 프레임';
+        });
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('녹화 완료: $_frameCount 프레임 저장됨\n경로: ${_sessionDirectory!.path}'),
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isProcessing = false;
+          _statusText = '녹화 중지 실패: $e';
+        });
+      }
+    }
+  }
+
+  // 임시 파일 정리
+  Future<void> _cleanupTempFiles() async {
+    try {
+      if (_sessionDirectory != null && _sessionDirectory!.existsSync()) {
+        await _sessionDirectory!.delete(recursive: true);
+      }
+    } catch (e) {
+      print('임시 파일 정리 오류: $e');
     }
   }
 
@@ -327,6 +456,71 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
                         bottom: 0,
                         child: RankingSlotPanel(),
                       ),
+                      // 녹화 상태 표시
+                      Positioned(
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          color: _isRecording
+                              ? Colors.red.withValues(alpha: 0.1)
+                              : _isProcessing
+                                  ? Colors.orange.withValues(alpha: 0.1)
+                                  : Colors.green.withValues(alpha: 0.1),
+                          child: Row(
+                            children: [
+                              if (_isRecording)
+                                const Icon(Icons.fiber_manual_record,
+                                    color: Colors.red, size: 16),
+                              if (_isProcessing)
+                                const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                ),
+                              if (!_isRecording && !_isProcessing)
+                                const Icon(Icons.check_circle,
+                                    color: Colors.green, size: 16),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  _statusText,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    shadows: [
+                                      Shadow(
+                                        offset: Offset(1, 1),
+                                        blurRadius: 2,
+                                        color: Colors.black54,
+                                      ),
+                                    ],
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              if (_isRecording) ...{
+                                Text(
+                                  '프레임: $_frameCount',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    shadows: [
+                                      Shadow(
+                                        offset: Offset(1, 1),
+                                        blurRadius: 2,
+                                        color: Colors.black54,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              },
+                            ],
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                   );
@@ -341,10 +535,39 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
                 }
               },
             ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _captureFrame,
-        tooltip: '화면 캡처',
-        child: const Icon(Icons.camera_alt),
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // 단일 캡처 버튼
+          FloatingActionButton(
+            heroTag: "capture",
+            onPressed: _isRecording || _isProcessing ? null : _captureFrame,
+            tooltip: '화면 캡처',
+            backgroundColor: _isRecording || _isProcessing ? Colors.grey : null,
+            child: const Icon(Icons.camera_alt),
+          ),
+          const SizedBox(height: 12),
+          // 녹화 시작/중지 버튼
+          FloatingActionButton(
+            heroTag: "recording",
+            onPressed: _isProcessing 
+                ? null 
+                : _isRecording 
+                    ? _stopRecording 
+                    : _startRecording,
+            tooltip: _isRecording ? '녹화 중지' : '녹화 시작',
+            backgroundColor: _isRecording 
+                ? Colors.red 
+                : _isProcessing 
+                    ? Colors.grey 
+                    : Colors.green,
+            child: Icon(_isRecording 
+                ? Icons.stop 
+                : _isProcessing 
+                    ? Icons.hourglass_empty
+                    : Icons.videocam),
+          ),
+        ],
       ),
     );
   }
