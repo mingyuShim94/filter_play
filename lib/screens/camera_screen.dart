@@ -191,15 +191,15 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
           imagePath: imagePath,
         );
 
-        // 디버깅: 입술 정보를 120프레임마다 출력 (성능 영향 최소화)
-        if (kDebugMode && _frameCount % 120 == 0) {
-          if (lipLandmarks.isComplete) {
-            LipTrackingService.printLipLandmarks(lipLandmarks);
-          }
-          if (foreheadRectangle != null && foreheadRectangle.isValid) {
-            ForeheadRectangleService.printForeheadRectangle(foreheadRectangle);
-          }
-        }
+        // 디버깅: 입술 정보를 120프레임마다 출력 (비활성화)
+        // if (kDebugMode && _frameCount % 120 == 0) {
+        //   if (lipLandmarks.isComplete) {
+        //     LipTrackingService.printLipLandmarks(lipLandmarks);
+        //   }
+        //   if (foreheadRectangle != null && foreheadRectangle.isValid) {
+        //     ForeheadRectangleService.printForeheadRectangle(foreheadRectangle);
+        //   }
+        // }
 
         // T2C.4: 입 상태 판정
         final newMouthState =

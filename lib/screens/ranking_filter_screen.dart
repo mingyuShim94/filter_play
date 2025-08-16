@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 import 'dart:ui' as ui;
+import 'dart:typed_data';
 
 import 'package:camera/camera.dart';
 import 'package:flutter/cupertino.dart';
@@ -12,10 +13,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:ffmpeg_kit_flutter_new/ffmpeg_kit.dart';
+import 'package:ffmpeg_kit_flutter_new/return_code.dart';
+import 'package:record/record.dart';
 import '../services/forehead_rectangle_service.dart';
 import '../providers/ranking_game_provider.dart';
 import '../services/ranking_data_service.dart';
 import '../widgets/ranking_slot_panel.dart';
+import 'result_screen.dart';
 
 /// RankingFilterScreen is a ranking filter page.
 class RankingFilterScreen extends ConsumerStatefulWidget {
@@ -54,8 +59,15 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
   bool _isProcessing = false;
   String _statusText = '녹화 준비됨';
   Timer? _frameCaptureTimer;
+  final AudioRecorder _audioRecorder = AudioRecorder();
   Directory? _sessionDirectory;
   int _frameCount = 0;
+  
+  // 진단용 타이밍 정보
+  DateTime? _recordingStartTime;
+  DateTime? _recordingEndTime;
+  int _skippedFrames = 0;
+  bool _isCapturingFrame = false;
   
 
   @override
@@ -85,6 +97,7 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
     
     _controller?.dispose();
     _faceDetector.close();
+    _audioRecorder.dispose();
     // 이마 이미지 리소스 정리
     ForeheadRectangleService.disposeTextureImage();
     super.dispose();
@@ -94,6 +107,31 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
     final status = await Permission.camera.request();
     if (status != PermissionStatus.granted) {
       print("Permissions Denied");
+    }
+  }
+
+  // 녹화용 권한 확인 및 요청
+  Future<bool> _checkPermissions() async {
+    try {
+      // 마이크 권한 확인
+      final micPermission = await Permission.microphone.request();
+      if (!micPermission.isGranted) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('마이크 권한이 필요합니다')),
+          );
+        }
+        return false;
+      }
+
+      return true;
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('권한 확인 오류: $e')),
+        );
+      }
+      return false;
     }
   }
 
@@ -292,10 +330,16 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
 
   // 녹화 시작
   Future<void> _startRecording() async {
+    // 권한 확인
+    if (!await _checkPermissions()) return;
+
     setState(() {
       _isRecording = true;
       _statusText = '녹화 중...';
       _frameCount = 0;
+      _skippedFrames = 0;
+      _isCapturingFrame = false;
+      _recordingStartTime = DateTime.now();
     });
 
     try {
@@ -306,9 +350,13 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
       );
       await _sessionDirectory!.create();
 
-      // 프레임 캡처 시작 (24fps)
+      // 오디오 녹음 시작
+      final audioPath = '${_sessionDirectory!.path}/audio.m4a';
+      await _audioRecorder.start(const RecordConfig(), path: audioPath);
+
+      // 적응형 프레임 캡처 (성능에 따라 조정)
       _frameCaptureTimer = Timer.periodic(
-        Duration(milliseconds: (1000 / 24).round()),
+        Duration(microseconds: (1000000 / 20).round()),  // 20fps로 안정성 우선 (50ms 간격)
         (timer) => _captureFrameForRecording(),
       );
     } catch (e) {
@@ -324,11 +372,22 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
     // 위젯이 dispose된 상태에서는 실행하지 않음
     if (!mounted) return;
     
+    // 이전 캡처가 진행 중이면 스킵
+    if (_isCapturingFrame) {
+      _skippedFrames++;
+      print('\x1b[91m🎬 ⏭️  프레임 스킵됨 (캡처 진행 중): $_skippedFrames\x1b[0m');
+      return;
+    }
+    
+    _isCapturingFrame = true;
+    final captureStartTime = DateTime.now();
+    
     try {
       RenderRepaintBoundary boundary = _captureKey.currentContext!
           .findRenderObject() as RenderRepaintBoundary;
 
-      ui.Image image = await boundary.toImage(pixelRatio: 1.0);
+      // 성능 최적화: 해상도 50% 감소 (4배 빠른 처리)
+      ui.Image image = await boundary.toImage(pixelRatio: 0.5);
       ByteData? byteData =
           await image.toByteData(format: ui.ImageByteFormat.png);
 
@@ -340,7 +399,12 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
             'frame_${(_frameCount + 1).toString().padLeft(5, '0')}.png';
         final file = File('${_sessionDirectory!.path}/$fileName');
 
-        await file.writeAsBytes(pngBytes);
+        // 비동기 파일 저장으로 메인 스레드 블로킹 최소화
+        file.writeAsBytes(pngBytes).then((_) {
+          // 파일 저장 완료 후 처리할 로직이 있다면 여기에
+        }).catchError((error) {
+          print('🎬 ❌ 프레임 저장 오류: $error');
+        });
 
         // setState 호출 전 mounted 체크
         if (mounted) {
@@ -348,51 +412,285 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
             _frameCount++;
           });
         }
+        
+        final captureEndTime = DateTime.now();
+        final captureDuration = captureEndTime.difference(captureStartTime).inMilliseconds;
+        
+        // 상세한 성능 측정 로그 (20fps 기준: 50ms 목표)
+        if (captureDuration > 60) {
+          print('\x1b[91m🎬 ⚠️  느린 캡처: ${captureDuration}ms (목표: 50ms)\x1b[0m');
+        } else if (captureDuration > 50) {
+          print('\x1b[93m🎬 ⚡ 약간 지연: ${captureDuration}ms\x1b[0m');
+        } else {
+          print('\x1b[92m🎬 ✅ 빠른 캡처: ${captureDuration}ms\x1b[0m');
+        }
       }
     } catch (e) {
       print('프레임 캡처 오류: $e');
+    } finally {
+      _isCapturingFrame = false;
     }
   }
 
   // 녹화 중지
   Future<void> _stopRecording() async {
-    // 타이머 먼저 중지하여 추가 프레임 캡처 방지
-    _frameCaptureTimer?.cancel();
-    _frameCaptureTimer = null;
+    _recordingEndTime = DateTime.now();
     
-    if (mounted) {
-      setState(() {
-        _isRecording = false;
-        _isProcessing = true;
-        _statusText = '녹화 중지됨 - $_frameCount 프레임 저장됨';
-      });
-    }
+    setState(() {
+      _isRecording = false;
+      _isProcessing = true;
+      _statusText = '동영상 처리 중...';
+    });
 
     try {
-      // 임시 파일 정리 (2단계에서는 삭제하지 않고 유지)
-      // await _cleanupTempFiles();
+      // 타이머 중지
+      _frameCaptureTimer?.cancel();
+      _frameCaptureTimer = null;
+
+      // 오디오 녹음 중지
+      await _audioRecorder.stop();
       
-      if (mounted) {
+      // 녹화 통계 출력 (FFmpeg에서 실제 FPS 계산 후 출력)
+
+      // FFmpeg로 동영상 합성
+      await _composeVideo();
+    } catch (e) {
+      setState(() {
+        _isProcessing = false;
+        _statusText = '녹화 중지 실패: $e';
+      });
+    }
+  }
+
+  // FFmpeg를 사용한 동영상 합성
+  Future<void> _composeVideo() async {
+    try {
+      // 실제 FPS 계산 및 녹화 통계 출력
+      double actualFps = 24.0; // 기본값
+      if (_recordingStartTime != null && _recordingEndTime != null) {
+        final actualRecordingDuration = _recordingEndTime!.difference(_recordingStartTime!);
+        final actualRecordingSeconds = actualRecordingDuration.inMilliseconds / 1000.0;
+        actualFps = _frameCount / actualRecordingSeconds;
+        final expectedFrames = (actualRecordingDuration.inMilliseconds / (1000 / 20)).round(); // 20fps 기준
+        
+        print('\x1b[96m🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬\x1b[0m');
+        print('\x1b[93m🎬🎬🎬🎬🎬🎬🎬🎬🎬 📊 녹화 시간 분석 📊 🎬🎬🎬🎬🎬🎬🎬🎬🎬\x1b[0m');
+        print('\x1b[96m🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬\x1b[0m');
+        print('\x1b[92m🎬 ⏱️  실제 녹화 시간: ${actualRecordingDuration.inSeconds}.${actualRecordingDuration.inMilliseconds % 1000}초\x1b[0m');
+        print('\x1b[92m🎬 📹 캡처된 프레임 수: $_frameCount\x1b[0m');
+        print('\x1b[92m🎬 🎯 예상 프레임 수: $expectedFrames (20fps 기준)\x1b[0m');
+        print('\x1b[94m🎬 📊 실제 캡처 FPS: ${actualFps.toStringAsFixed(2)}\x1b[0m');
+        print('\x1b[91m🎬 ⚠️  스킵된 프레임 수: $_skippedFrames\x1b[0m');
+        print('\x1b[91m🎬 📉 프레임 손실률: ${((_skippedFrames / (expectedFrames > 0 ? expectedFrames : 1)) * 100).toStringAsFixed(1)}%\x1b[0m');
+        print('\x1b[96m🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬\x1b[0m');
+      }
+      
+      // 출력 파일 경로
+      final documentsDir = await getApplicationDocumentsDirectory();
+      final outputPath =
+          '${documentsDir.path}/screen_record_${DateTime.now().millisecondsSinceEpoch}.mp4';
+
+      // FFmpeg 명령어 구성
+      final framePath = '${_sessionDirectory!.path}/frame_%05d.png';
+      final audioPath = '${_sessionDirectory!.path}/audio.m4a';
+      
+      // 파일 존재 여부 확인
+      final audioFile = File(audioPath);
+      final firstFrameFile = File('${_sessionDirectory!.path}/frame_00001.png');
+
+      // 동적 프레임레이트로 정확한 동영상 길이 계산
+      final expectedDurationSeconds = _frameCount / actualFps;
+      
+      String command;
+      
+      if (audioFile.existsSync() && audioFile.lengthSync() > 0) {
+        // 오디오와 비디오 함께 합성 - 실제 fps로 정확한 동기화
+        command = '-framerate ${actualFps.toStringAsFixed(2)} -i "$framePath" -i "$audioPath" -vf "scale=360:696" -c:v libx264 -c:a aac -pix_fmt yuv420p -preset ultrafast "$outputPath"';
+        print('\x1b[95m🎬 🎵 오디오+비디오 합성 모드 (실제fps: ${actualFps.toStringAsFixed(2)}, 예상길이: ${expectedDurationSeconds.toStringAsFixed(1)}초)\x1b[0m');
+      } else {
+        // 비디오만 생성
+        command = '-framerate ${actualFps.toStringAsFixed(2)} -i "$framePath" -vf "scale=360:696" -c:v libx264 -pix_fmt yuv420p -preset ultrafast "$outputPath"';
+        print('\x1b[94m🎬 📹 비디오 전용 합성 모드 (실제fps: ${actualFps.toStringAsFixed(2)}, 예상길이: ${expectedDurationSeconds.toStringAsFixed(1)}초)\x1b[0m');
+      }
+      
+
+      print('\x1b[95m🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬\x1b[0m');
+      print('\x1b[93m🎬🎬🎬🎬🎬🎬 ⚙️  FFmpeg 동영상 합성 시작 ⚙️  🎬🎬🎬🎬🎬🎬\x1b[0m');
+      print('\x1b[95m🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬\x1b[0m');
+      print('🎬 명령어: $command');
+      print('🎬 프레임 경로: $framePath');
+      print('🎬 오디오 경로: $audioPath');
+      print('🎬 출력 경로: $outputPath');
+
+      // 파일 존재 여부 및 상세 정보 확인
+      
+      print('🎬 오디오 파일 존재: ${audioFile.existsSync()}');
+      if (audioFile.existsSync()) {
+        print('🎬 오디오 파일 크기: ${audioFile.lengthSync()} bytes');
+      }
+      
+      print('🎬 첫 번째 프레임 존재: ${firstFrameFile.existsSync()}');
+      if (firstFrameFile.existsSync()) {
+        print('🎬 첫 번째 프레임 크기: ${firstFrameFile.lengthSync()} bytes');
+      }
+      
+      print('🎬 프레임 개수: $_frameCount');
+      print('🎬 세션 디렉토리: ${_sessionDirectory!.path}');
+      
+      // 디렉토리 내 실제 프레임 파일 수 확인
+      try {
+        final files = _sessionDirectory!.listSync();
+        final frameFiles = files.where((file) => 
+          file is File && file.path.contains('frame_') && file.path.endsWith('.png')
+        ).toList();
+        
+        print('🎬 디렉토리 내 전체 파일 개수: ${files.length}');
+        print('🎬 실제 프레임 파일 개수: ${frameFiles.length}');
+        print('🎬 카운터 프레임 개수: $_frameCount');
+        print('🎬 프레임 파일 불일치: ${frameFiles.length != _frameCount ? "있음" : "없음"}');
+        
+        for (final file in files.take(3)) { // 처음 3개만 출력
+          if (file is File) {
+            print('🎬 파일: ${file.path.split('/').last} (${file.lengthSync()} bytes)');
+          }
+        }
+        
+        // 실제 프레임 파일 수로 재계산
+        if (frameFiles.length != _frameCount) {
+          print('🎬 ⚠️ 프레임 카운터와 실제 파일 수가 다릅니다!');
+          print('🎬 실제 저장된 프레임으로 길이 재계산: ${frameFiles.length / 24.0}초');
+        }
+      } catch (e) {
+        print('🎬 디렉토리 읽기 오류: $e');
+      }
+      print('🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬');
+
+      // FFmpeg 실행 (타임아웃 30초)
+      print('\x1b[94m🎬 ⚡ FFmpeg 실행 시작...\x1b[0m');
+      
+      dynamic session;
+      try {
+        session = await FFmpegKit.execute(command).timeout(
+          const Duration(seconds: 30),
+          onTimeout: () {
+            print('\x1b[91m❌ FFmpeg 30초 타임아웃!\x1b[0m');
+            throw TimeoutException('FFmpeg 실행 타임아웃', const Duration(seconds: 30));
+          },
+        );
+        print('\x1b[92m🎬 ✅ FFmpeg 실행 완료!\x1b[0m');
+      } catch (e) {
+        if (e is TimeoutException) {
+          print('❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌');
+          print('❌ FFmpeg 타임아웃! (30초 초과)');
+          print('❌ 더 간단한 명령어나 더 적은 프레임으로 시도해보세요');
+          print('❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌');
+        } else {
+          print('❌ FFmpeg 실행 중 오류: $e');
+        }
+        rethrow;
+      }
+      
+      final returnCode = await session.getReturnCode();
+      final output = await session.getOutput();
+      final failStackTrace = await session.getFailStackTrace();
+      final logs = await session.getAllLogs();
+
+      print('🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬');
+      print('🎬 FFmpeg 실행 결과');
+      print('🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬');
+      print('🎬 리턴 코드: $returnCode');
+      print('🎬 FFmpeg 출력 (길이: ${output?.length ?? 0}):');
+      if (output != null && output.isNotEmpty) {
+        // 출력을 작은 청크로 나누어 출력
+        final chunks = _splitStringIntoChunks(output, 1000);
+        for (int i = 0; i < chunks.length; i++) {
+          print('🎬 출력[$i/${chunks.length-1}]: ${chunks[i]}');
+        }
+      } else {
+        print('🎬 출력이 비어있음');
+      }
+      
+      if (failStackTrace != null && failStackTrace.isNotEmpty) {
+        print('🎬 에러 스택: $failStackTrace');
+      } else {
+        print('🎬 에러 스택이 비어있음');
+      }
+      
+      // 로그 출력
+      if (logs.isNotEmpty) {
+        print('🎬 전체 로그 개수: ${logs.length}');
+        for (int i = 0; i < logs.length && i < 10; i++) { // 최대 10개만
+          final log = logs[i];
+          print('🎬 로그[$i]: ${log.getMessage()}');
+        }
+      } else {
+        print('🎬 로그가 비어있음');
+      }
+      print('🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬');
+
+      if (ReturnCode.isSuccess(returnCode)) {
+        // 성공적으로 완료
+        await _cleanupTempFiles();
         setState(() {
           _isProcessing = false;
-          _statusText = '녹화 완료 - $_frameCount 프레임';
+          _statusText = '녹화 완료! 저장됨: ${outputPath.split('/').last}';
         });
+
+        print('\x1b[92m🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬\x1b[0m');
+        print('\x1b[93m🎬🎬🎬🎬🎬 🎉 동영상 합성 성공! 🎉 🎬🎬🎬🎬🎬\x1b[0m');
+        print('\x1b[92m🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬\x1b[0m');
+        print('\x1b[96m🎬 💾 저장된 파일: ${outputPath.split('/').last}\x1b[0m');
         
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('녹화 완료: $_frameCount 프레임 저장됨\n경로: ${_sessionDirectory!.path}'),
-            duration: const Duration(seconds: 5),
-          ),
-        );
+        if (mounted) {
+          // 성공 메시지 표시
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('동영상이 저장되었습니다: ${outputPath.split('/').last}'),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+          
+          // 결과 화면으로 이동 (동영상 경로 전달)
+          await Future.delayed(const Duration(milliseconds: 500)); // 스낵바 표시 후 잠깐 대기
+          
+          if (mounted) {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (context) => ResultScreen(
+                  score: 0, // 임시 점수 (실제 게임 점수로 대체 필요)
+                  totalBalloons: 0, // 임시 값 (실제 게임 데이터로 대체 필요)
+                  videoPath: outputPath,
+                ),
+              ),
+            );
+          }
+        }
+      } else {
+        print('❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌');
+        print('❌ FFmpeg 실행 실패!');
+        print('❌ 리턴 코드: $returnCode');
+        print('❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌');
+        throw Exception('FFmpeg 실행 실패 - 리턴 코드: $returnCode');
       }
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isProcessing = false;
-          _statusText = '녹화 중지 실패: $e';
-        });
-      }
+      print('❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌');
+      print('❌ 동영상 합성 치명적 오류!');
+      print('❌ 오류 내용: $e');
+      print('❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌');
+      setState(() {
+        _isProcessing = false;
+        _statusText = '동영상 합성 실패: $e';
+      });
     }
+  }
+
+  // 문자열을 청크로 나누는 헬퍼 메서드
+  List<String> _splitStringIntoChunks(String input, int chunkSize) {
+    List<String> chunks = [];
+    for (int i = 0; i < input.length; i += chunkSize) {
+      chunks.add(input.substring(i, (i + chunkSize < input.length) ? i + chunkSize : input.length));
+    }
+    return chunks;
   }
 
   // 임시 파일 정리

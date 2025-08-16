@@ -1,14 +1,26 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'screens/filter_list_screen.dart';
 import 'services/filter_data_service.dart';
 
 void main() {
-  runApp(
-    const ProviderScope(
-      child: FilterPlayApp(),
-    ),
-  );
+  // Flutter Zone을 사용하여 print 출력 필터링
+  runZoned(() {
+    runApp(
+      const ProviderScope(
+        child: FilterPlayApp(),
+      ),
+    );
+  }, zoneSpecification: ZoneSpecification(
+    print: (Zone self, ZoneDelegate parent, Zone zone, String message) {
+      // 🎬 로그만 허용
+      if (message.contains('🎬')) {
+        parent.print(zone, message);
+      }
+      // 다른 로그는 억제
+    },
+  ));
 }
 
 class FilterPlayApp extends StatelessWidget {
