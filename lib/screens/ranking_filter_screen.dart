@@ -515,24 +515,21 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
     }
   }
 
-  // RawRGBA → PNG 변환 및 동영상 합성
+  // RawRGBA 직접 처리 동영상 합성 (PNG 변환 단계 제거)
   Future<void> _convertRawToPngAndCompose() async {
     setState(() {
       _isConverting = true;
-      _statusText = 'RawRGBA 프레임을 PNG로 변환 중...';
+      _statusText = 'RawRGBA 직접 처리로 동영상 합성 준비 중...';
     });
 
     try {
-      // 1단계: RawRGBA → PNG 변환
-      await _convertRawFramesToPng();
-
-      // 2단계: PNG로 FFmpeg 동영상 합성
+      // PNG 변환 단계 건너뛰고 바로 Raw RGBA 직접 처리
       await _composeVideo();
     } catch (e) {
       setState(() {
         _isProcessing = false;
         _isConverting = false;
-        _statusText = 'RawRGBA 변환 실패: $e';
+        _statusText = 'RawRGBA 직접 처리 실패: $e';
       });
       rethrow;
     }
@@ -769,17 +766,19 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
     }
   }
 
-  // FFmpeg를 사용한 동영상 합성
+  // FFmpeg를 사용한 동영상 합성 (RawRGBA 직접 처리 방식)
   Future<void> _composeVideo() async {
     try {
-      // 실제 FPS 계산 및 녹화 통계 출력
-      double actualFps = 24.0; // 기본값
+      // 1. 녹화 통계 및 실제 FPS 계산 (기존 코드와 동일)
+      double actualFps = 24.0;
       if (_recordingStartTime != null && _recordingEndTime != null) {
         final actualRecordingDuration =
             _recordingEndTime!.difference(_recordingStartTime!);
         final actualRecordingSeconds =
             actualRecordingDuration.inMilliseconds / 1000.0;
-        actualFps = _frameCount / actualRecordingSeconds;
+        if (actualRecordingSeconds > 0) {
+          actualFps = _frameCount / actualRecordingSeconds;
+        }
         final expectedFrames =
             (actualRecordingDuration.inMilliseconds / (1000 / 20))
                 .round(); // 20fps 기준
@@ -794,8 +793,7 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
             '\x1b[92m🎬 ⏱️  실제 녹화 시간: ${actualRecordingDuration.inSeconds}.${actualRecordingDuration.inMilliseconds % 1000}초\x1b[0m');
         print('\x1b[92m🎬 📹 캡처된 프레임 수: $_frameCount\x1b[0m');
         print('\x1b[92m🎬 🎯 예상 프레임 수: $expectedFrames (20fps 기준)\x1b[0m');
-        print(
-            '\x1b[94m🎬 📊 실제 캡처 FPS: ${actualFps.toStringAsFixed(2)}\x1b[0m');
+        print('\x1b[94m🎬 📊 실제 캡처 FPS: ${actualFps.toStringAsFixed(2)}\x1b[0m');
         print('\x1b[91m🎬 ⚠️  스킵된 프레임 수: $_skippedFrames\x1b[0m');
         print(
             '\x1b[91m🎬 📉 프레임 손실률: ${((_skippedFrames / (expectedFrames > 0 ? expectedFrames : 1)) * 100).toStringAsFixed(1)}%\x1b[0m');
@@ -803,178 +801,84 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
             '\x1b[96m🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬\x1b[0m');
       }
 
-      // 출력 파일 경로
+      // 2. 모든 .raw 파일을 찾아 정렬하고, 첫 프레임에서 해상도 추출
+      final rawFiles = _sessionDirectory!
+          .listSync()
+          .where((file) => file is File && file.path.endsWith('.raw'))
+          .cast<File>()
+          .toList();
+
+      if (rawFiles.isEmpty) {
+        throw Exception('처리할 Raw 프레임 파일이 없습니다.');
+      }
+      rawFiles.sort((a, b) => a.path.compareTo(b.path)); // 파일명 순서로 정렬
+
+      // 첫 번째 파일명에서 해상도 정보 추출 (예: 'frame_00001_1170x2532.raw')
+      final firstFileName = rawFiles.first.path.split('/').last;
+      final match = RegExp(r'frame_\d+_(\d+x\d+)\.raw').firstMatch(firstFileName);
+      if (match == null || match.group(1) == null) {
+        throw Exception('첫 번째 프레임 파일명에서 해상도를 추출할 수 없습니다: $firstFileName');
+      }
+      final videoSize = match.group(1)!; // "1170x2532" 형태
+      print('🎬 해상도 감지: $videoSize');
+
+      // 3. 모든 Raw 프레임을 하나의 파일로 합치기
+      setState(() {
+        _statusText = 'Raw 프레임 병합 중...';
+      });
+      final concatenatedRawPath = '${_sessionDirectory!.path}/video.raw';
+      final concatenatedFile = File(concatenatedRawPath);
+      final sink = concatenatedFile.openWrite();
+      for (int i = 0; i < rawFiles.length; i++) {
+         final file = rawFiles[i];
+         final bytes = await file.readAsBytes();
+         sink.add(bytes);
+         if (mounted && i % 10 == 0) { // 진행률 표시 (선택사항)
+           setState(() {
+             _statusText = 'Raw 프레임 병합 중... ${i + 1}/${rawFiles.length}';
+           });
+         }
+      }
+      await sink.close();
+      print('🎬 Raw 프레임 병합 완료: $concatenatedRawPath');
+      
+      // 4. FFmpeg 명령어 구성 (Raw 비디오 입력 사용)
+      setState(() {
+          _statusText = 'FFmpeg으로 동영상 합성 중...';
+      });
       final documentsDir = await getApplicationDocumentsDirectory();
       final outputPath =
           '${documentsDir.path}/screen_record_${DateTime.now().millisecondsSinceEpoch}.mp4';
-
-      // FFmpeg 명령어 구성 (PNG 파일 사용)
-      final framePath = '${_sessionDirectory!.path}/frame_%05d.png';
       final audioPath = '${_sessionDirectory!.path}/audio.m4a';
-
-      // 파일 존재 여부 확인
       final audioFile = File(audioPath);
-      final firstFrameFile = File('${_sessionDirectory!.path}/frame_00001.png');
-
-      // 동적 프레임레이트로 정확한 동영상 길이 계산
-      final expectedDurationSeconds = _frameCount / actualFps;
 
       String command;
+      final videoInput = '-f rawvideo -pixel_format rgba -video_size $videoSize -framerate ${actualFps.toStringAsFixed(2)} -i "$concatenatedRawPath"';
+      final videoOutput = '-c:v libx264 -pix_fmt yuv420p -preset ultrafast -vf "scale=360:696"'; // yuv420p는 호환성이 좋음
 
       if (audioFile.existsSync() && audioFile.lengthSync() > 0) {
-        // 오디오와 비디오 함께 합성 - 실제 fps로 정확한 동기화
-        command =
-            '-framerate ${actualFps.toStringAsFixed(2)} -i "$framePath" -i "$audioPath" -vf "scale=360:696" -c:v libx264 -c:a aac -pix_fmt yuv420p -preset ultrafast "$outputPath"';
-        print(
-            '\x1b[95m🎬 🎵 오디오+비디오 합성 모드 (실제fps: ${actualFps.toStringAsFixed(2)}, 예상길이: ${expectedDurationSeconds.toStringAsFixed(1)}초)\x1b[0m');
+        // 오디오 + 비디오
+        command = '$videoInput -i "$audioPath" $videoOutput -c:a aac "$outputPath"';
+        print('🎬 🎵 오디오+비디오(Raw) 합성 모드');
       } else {
-        // 비디오만 생성
-        command =
-            '-framerate ${actualFps.toStringAsFixed(2)} -i "$framePath" -vf "scale=360:696" -c:v libx264 -pix_fmt yuv420p -preset ultrafast "$outputPath"';
-        print(
-            '\x1b[94m🎬 📹 비디오 전용 합성 모드 (실제fps: ${actualFps.toStringAsFixed(2)}, 예상길이: ${expectedDurationSeconds.toStringAsFixed(1)}초)\x1b[0m');
+        // 비디오 전용
+        command = '$videoInput $videoOutput "$outputPath"';
+        print('🎬 📹 비디오(Raw) 전용 합성 모드');
       }
-
-      print(
-          '\x1b[95m🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬\x1b[0m');
-      print(
-          '\x1b[93m🎬🎬🎬🎬🎬🎬 ⚙️  FFmpeg 동영상 합성 시작 ⚙️  🎬🎬🎬🎬🎬🎬\x1b[0m');
-      print(
-          '\x1b[95m🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬\x1b[0m');
+      
       print('🎬 명령어: $command');
-      print('🎬 프레임 경로: $framePath');
-      print('🎬 오디오 경로: $audioPath');
-      print('🎬 출력 경로: $outputPath');
 
-      // 파일 존재 여부 및 상세 정보 확인
-
-      print('🎬 오디오 파일 존재: ${audioFile.existsSync()}');
-      if (audioFile.existsSync()) {
-        print('🎬 오디오 파일 크기: ${audioFile.lengthSync()} bytes');
-      }
-
-      print('🎬 첫 번째 프레임 존재: ${firstFrameFile.existsSync()}');
-      if (firstFrameFile.existsSync()) {
-        print('🎬 첫 번째 프레임 크기: ${firstFrameFile.lengthSync()} bytes');
-      }
-
-      print('🎬 프레임 개수: $_frameCount');
-      print('🎬 세션 디렉토리: ${_sessionDirectory!.path}');
-
-      // 디렉토리 내 실제 프레임 파일 수 확인
-      try {
-        final files = _sessionDirectory!.listSync();
-        final frameFiles = files
-            .where((file) =>
-                file is File &&
-                file.path.contains('frame_') &&
-                file.path.endsWith('.png'))
-            .toList();
-
-        print('🎬 디렉토리 내 전체 파일 개수: ${files.length}');
-        print('🎬 실제 프레임 파일 개수: ${frameFiles.length}');
-        print('🎬 카운터 프레임 개수: $_frameCount');
-        print(
-            '🎬 프레임 파일 불일치: ${frameFiles.length != _frameCount ? "있음" : "없음"}');
-
-        for (final file in files.take(3)) {
-          // 처음 3개만 출력
-          if (file is File) {
-            print(
-                '🎬 파일: ${file.path.split('/').last} (${file.lengthSync()} bytes)');
-          }
-        }
-
-        // 실제 프레임 파일 수로 재계산
-        if (frameFiles.length != _frameCount) {
-          print('🎬 ⚠️ 프레임 카운터와 실제 파일 수가 다릅니다!');
-          print('🎬 실제 저장된 프레임으로 길이 재계산: ${frameFiles.length / 24.0}초');
-        }
-      } catch (e) {
-        print('🎬 디렉토리 읽기 오류: $e');
-      }
-      print('🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬');
-
-      // FFmpeg 실행 (타임아웃 30초)
-      print('\x1b[94m🎬 ⚡ FFmpeg 실행 시작...\x1b[0m');
-
-      dynamic session;
-      try {
-        session = await FFmpegKit.execute(command).timeout(
-          const Duration(seconds: 30),
-          onTimeout: () {
-            print('\x1b[91m❌ FFmpeg 30초 타임아웃!\x1b[0m');
-            throw TimeoutException(
-                'FFmpeg 실행 타임아웃', const Duration(seconds: 30));
-          },
-        );
-        print('\x1b[92m🎬 ✅ FFmpeg 실행 완료!\x1b[0m');
-      } catch (e) {
-        if (e is TimeoutException) {
-          print('❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌');
-          print('❌ FFmpeg 타임아웃! (30초 초과)');
-          print('❌ 더 간단한 명령어나 더 적은 프레임으로 시도해보세요');
-          print('❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌');
-        } else {
-          print('❌ FFmpeg 실행 중 오류: $e');
-        }
-        rethrow;
-      }
-
+      // 5. FFmpeg 실행 (기존 코드와 유사)
+      final session = await FFmpegKit.execute(command);
       final returnCode = await session.getReturnCode();
-      final output = await session.getOutput();
-      final failStackTrace = await session.getFailStackTrace();
-      final logs = await session.getAllLogs();
-
-      print('🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬');
-      print('🎬 FFmpeg 실행 결과');
-      print('🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬');
-      print('🎬 리턴 코드: $returnCode');
-      print('🎬 FFmpeg 출력 (길이: ${output?.length ?? 0}):');
-      if (output != null && output.isNotEmpty) {
-        // 출력을 작은 청크로 나누어 출력
-        final chunks = _splitStringIntoChunks(output, 1000);
-        for (int i = 0; i < chunks.length; i++) {
-          print('🎬 출력[$i/${chunks.length - 1}]: ${chunks[i]}');
-        }
-      } else {
-        print('🎬 출력이 비어있음');
-      }
-
-      if (failStackTrace != null && failStackTrace.isNotEmpty) {
-        print('🎬 에러 스택: $failStackTrace');
-      } else {
-        print('🎬 에러 스택이 비어있음');
-      }
-
-      // 로그 출력
-      if (logs.isNotEmpty) {
-        print('🎬 전체 로그 개수: ${logs.length}');
-        for (int i = 0; i < logs.length && i < 10; i++) {
-          // 최대 10개만
-          final log = logs[i];
-          print('🎬 로그[$i]: ${log.getMessage()}');
-        }
-      } else {
-        print('🎬 로그가 비어있음');
-      }
-      print('🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬');
 
       if (ReturnCode.isSuccess(returnCode)) {
-        // 성공적으로 완료 (테스트를 위해 임시 파일 보존)
-        // await _cleanupTempFiles(); // 테스트를 위해 주석 처리
+        print('\x1b[92m🎉 동영상 합성 성공! (Raw 직접 처리) 🎉\x1b[0m');
         setState(() {
           _isProcessing = false;
           _isConverting = false;
           _statusText = '녹화 완료! 저장됨: ${outputPath.split('/').last}';
         });
-
-        print(
-            '\x1b[92m🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬\x1b[0m');
-        print('\x1b[93m🎬🎬🎬🎬🎬 🎉 동영상 합성 성공! 🎉 🎬🎬🎬🎬🎬\x1b[0m');
-        print(
-            '\x1b[92m🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬\x1b[0m');
-        print('\x1b[96m🎬 💾 저장된 파일: ${outputPath.split('/').last}\x1b[0m');
 
         if (mounted) {
           // 성공 메시지 표시
@@ -1002,17 +906,13 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
           }
         }
       } else {
-        print('❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌');
-        print('❌ FFmpeg 실행 실패!');
-        print('❌ 리턴 코드: $returnCode');
-        print('❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌');
-        throw Exception('FFmpeg 실행 실패 - 리턴 코드: $returnCode');
+        print('❌ FFmpeg 실행 실패! 리턴 코드: $returnCode');
+        print('🎬 에러 로그: ${await session.getFailStackTrace()}');
+        throw Exception('FFmpeg 실행 실패');
       }
+
     } catch (e) {
-      print('❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌');
-      print('❌ 동영상 합성 치명적 오류!');
-      print('❌ 오류 내용: $e');
-      print('❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌');
+      print('❌ 동영상 합성 중 치명적 오류: $e');
       setState(() {
         _isProcessing = false;
         _statusText = '동영상 합성 실패: $e';
