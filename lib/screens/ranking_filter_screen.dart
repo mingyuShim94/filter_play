@@ -367,7 +367,18 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
 
       // 오디오 녹음 시작
       final audioPath = '${_sessionDirectory!.path}/audio.m4a';
-      await _audioRecorder.start(const RecordConfig(), path: audioPath);
+      await _audioRecorder.start(
+        const RecordConfig(
+          // 안드로이드에서 자동 게인 컨트롤 활성화
+          autoGain: true,
+          // 에코 캔슬레이션 활성화
+          echoCancel: true,
+          // 노이즈 억제 활성화
+
+          noiseSuppress: true,
+        ),
+        path: audioPath,
+      );
 
       // 적응형 프레임 캡처 (성능에 따라 조정)
       _frameCaptureTimer = Timer.periodic(
@@ -434,13 +445,15 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
         // 해상도 분석 및 로깅
         final width = image.width;
         final height = image.height;
-        final resolutionGain = (width * height) / (logicalWidth * logicalHeight);
-        
+        final resolutionGain =
+            (width * height) / (logicalWidth * logicalHeight);
+
         print('\x1b[96m📱 해상도 분석:\x1b[0m');
         print('\x1b[96m  • 논리적 해상도: ${logicalWidth}x$logicalHeight\x1b[0m');
         print('\x1b[96m  • Device Pixel Ratio: $devicePixelRatio\x1b[0m');
         print('\x1b[96m  • 캡처된 해상도: ${width}x$height\x1b[0m');
-        print('\x1b[96m  • 해상도 향상: ${resolutionGain.toStringAsFixed(1)}배\x1b[0m');
+        print(
+            '\x1b[96m  • 해상도 향상: ${resolutionGain.toStringAsFixed(1)}배\x1b[0m');
 
         final fileName =
             'frame_${(_frameCount + 1).toString().padLeft(5, '0')}_${width}x$height.raw';
@@ -467,8 +480,9 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
         // 고해상도 성능 측정 로그 (예상 증가: 10-20ms → 30-60ms)
         print('\x1b[95m⚡ 성능 분석:\x1b[0m');
         print('\x1b[95m  • 캡처 시간: ${captureDuration}ms\x1b[0m');
-        print('\x1b[95m  • 데이터 크기: ${rawDataSizeMB.toStringAsFixed(1)}MB\x1b[0m');
-        
+        print(
+            '\x1b[95m  • 데이터 크기: ${rawDataSizeMB.toStringAsFixed(1)}MB\x1b[0m');
+
         if (captureDuration > 60) {
           print('\x1b[91m🎬 ⚠️  고해상도 캡처 느림: ${captureDuration}ms\x1b[0m');
         } else if (captureDuration > 30) {
@@ -597,16 +611,18 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
       File rawFile, int width, int height, File pngFile) async {
     try {
       final rawBytes = await rawFile.readAsBytes();
-      
+
       // 1. 데이터 크기 검증 (RGBA = 4바이트/픽셀)
       final expectedSize = width * height * 4;
       if (rawBytes.length != expectedSize) {
-        throw Exception('데이터 크기 불일치: 예상 ${expectedSize}B, 실제 ${rawBytes.length}B');
+        throw Exception(
+            '데이터 크기 불일치: 예상 ${expectedSize}B, 실제 ${rawBytes.length}B');
       }
 
       // 2. 기본 데이터 무결성 검증
       if (rawBytes.isEmpty || width <= 0 || height <= 0) {
-        throw Exception('유효하지 않은 이미지 데이터: ${width}x${height}, ${rawBytes.length}B');
+        throw Exception(
+            '유효하지 않은 이미지 데이터: ${width}x$height, ${rawBytes.length}B');
       }
 
       // 3. RawRGBA 데이터를 직접 ui.Image로 변환
@@ -621,7 +637,8 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
       final image = await completer.future;
 
       // 4. ui.Image → PNG 변환
-      final pngByteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      final pngByteData =
+          await image.toByteData(format: ui.ImageByteFormat.png);
       if (pngByteData == null) {
         image.dispose();
         throw Exception('PNG 데이터 생성 실패');
@@ -630,11 +647,11 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
       // 5. PNG 파일 쓰기
       final pngBytes = pngByteData.buffer.asUint8List();
       await pngFile.writeAsBytes(pngBytes);
-        
+
       // 6. PNG 파일 유효성 검증
       await _validatePngFile(pngFile, width, height);
-        
-      print('🔄 ✅ 변환 성공: ${width}x${height} -> ${await pngFile.length()}B PNG');
+
+      print('🔄 ✅ 변환 성공: ${width}x$height -> ${await pngFile.length()}B PNG');
 
       // 7. 메모리 정리 (중요: 누수 방지)
       image.dispose();
@@ -655,7 +672,7 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
     }
 
     final fileSize = await pngFile.length();
-    
+
     // 최소 크기 검증 (PNG 헤더 + 최소 데이터)
     if (fileSize < 100) {
       throw Exception('PNG 파일이 너무 작음: ${fileSize}B (최소 100B 필요)');
@@ -683,12 +700,13 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
 
     print('🔄 🔍 PNG 검증 통과: ${fileSize}B, 시그니처 OK');
   }
-  
+
   // 변환 실패 시 강화된 대안 방법
-  Future<void> _fallbackToPngCapture(File pngFile, int width, int height) async {
+  Future<void> _fallbackToPngCapture(
+      File pngFile, int width, int height) async {
     try {
       print('🔄 ⚠️  대안 방법: 강화된 PNG 직접 캡처 시도');
-      
+
       // 1. RepaintBoundary 상태 검증
       if (_captureKey.currentContext == null) {
         throw Exception('대안 캡처 실패: RepaintBoundary context가 null');
@@ -696,7 +714,7 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
 
       RenderRepaintBoundary? boundary = _captureKey.currentContext!
           .findRenderObject() as RenderRepaintBoundary?;
-      
+
       if (boundary == null) {
         throw Exception('대안 캡처 실패: RenderRepaintBoundary를 찾을 수 없음');
       }
@@ -708,9 +726,10 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
       // 3. 이미지 캡처 (고해상도)
       final clampedPixelRatio = devicePixelRatio;
       ui.Image image = await boundary.toImage(pixelRatio: clampedPixelRatio);
-      
+
       // 4. PNG 인코딩
-      final pngByteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      final pngByteData =
+          await image.toByteData(format: ui.ImageByteFormat.png);
       if (pngByteData == null) {
         image.dispose();
         throw Exception('대안 PNG 데이터 생성 실패');
@@ -719,17 +738,18 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
       // 5. 파일 쓰기 및 검증
       final pngBytes = pngByteData.buffer.asUint8List();
       await pngFile.writeAsBytes(pngBytes);
-      
+
       // 6. 대안 방법으로 생성된 파일 검증
       await _validatePngFile(pngFile, image.width, image.height);
-        
-      print('🔄 ✅ 대안 캡처 성공: ${image.width}x${image.height} -> ${pngBytes.length}B (계수 pixelRatio: $clampedPixelRatio)');
-      
+
+      print(
+          '🔄 ✅ 대안 캡처 성공: ${image.width}x${image.height} -> ${pngBytes.length}B (계수 pixelRatio: $clampedPixelRatio)');
+
       // 7. 메모리 정리
       image.dispose();
     } catch (e) {
       print('🔄 ❌ 대안 방법도 실패: $e');
-      
+
       // 최종 대체: 빈 PNG 파일 생성 (전체 실패 방지)
       await _createEmptyPngFile(pngFile, width, height);
     }
@@ -739,7 +759,7 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
   Future<void> _createEmptyPngFile(File pngFile, int width, int height) async {
     try {
       print('🔄 🌆 최종 대안: 빈 PNG 파일 생성');
-      
+
       // 1x1 크기의 기본 PNG 데이터 (투명 픽셀)
       final emptyPngBytes = [
         0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, // PNG 시그니처
@@ -755,9 +775,9 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
         0x0D, 0x0A, 0x2D, 0xB4, // IDAT CRC
         0x00, 0x00, 0x00, 0x00, // IEND 청크 사이즈
         0x49, 0x45, 0x4E, 0x44, // IEND 청크 타입
-        0xAE, 0x42, 0x60, 0x82  // IEND CRC
+        0xAE, 0x42, 0x60, 0x82 // IEND CRC
       ];
-      
+
       await pngFile.writeAsBytes(emptyPngBytes);
       print('🔄 ✅ 빈 PNG 파일 생성 완료: ${emptyPngBytes.length}B');
     } catch (e) {
@@ -793,7 +813,8 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
             '\x1b[92m🎬 ⏱️  실제 녹화 시간: ${actualRecordingDuration.inSeconds}.${actualRecordingDuration.inMilliseconds % 1000}초\x1b[0m');
         print('\x1b[92m🎬 📹 캡처된 프레임 수: $_frameCount\x1b[0m');
         print('\x1b[92m🎬 🎯 예상 프레임 수: $expectedFrames (20fps 기준)\x1b[0m');
-        print('\x1b[94m🎬 📊 실제 캡처 FPS: ${actualFps.toStringAsFixed(2)}\x1b[0m');
+        print(
+            '\x1b[94m🎬 📊 실제 캡처 FPS: ${actualFps.toStringAsFixed(2)}\x1b[0m');
         print('\x1b[91m🎬 ⚠️  스킵된 프레임 수: $_skippedFrames\x1b[0m');
         print(
             '\x1b[91m🎬 📉 프레임 손실률: ${((_skippedFrames / (expectedFrames > 0 ? expectedFrames : 1)) * 100).toStringAsFixed(1)}%\x1b[0m');
@@ -815,7 +836,8 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
 
       // 첫 번째 파일명에서 해상도 정보 추출 (예: 'frame_00001_1170x2532.raw')
       final firstFileName = rawFiles.first.path.split('/').last;
-      final match = RegExp(r'frame_\d+_(\d+x\d+)\.raw').firstMatch(firstFileName);
+      final match =
+          RegExp(r'frame_\d+_(\d+x\d+)\.raw').firstMatch(firstFileName);
       if (match == null || match.group(1) == null) {
         throw Exception('첫 번째 프레임 파일명에서 해상도를 추출할 수 없습니다: $firstFileName');
       }
@@ -830,21 +852,22 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
       final concatenatedFile = File(concatenatedRawPath);
       final sink = concatenatedFile.openWrite();
       for (int i = 0; i < rawFiles.length; i++) {
-         final file = rawFiles[i];
-         final bytes = await file.readAsBytes();
-         sink.add(bytes);
-         if (mounted && i % 10 == 0) { // 진행률 표시 (선택사항)
-           setState(() {
-             _statusText = 'Raw 프레임 병합 중... ${i + 1}/${rawFiles.length}';
-           });
-         }
+        final file = rawFiles[i];
+        final bytes = await file.readAsBytes();
+        sink.add(bytes);
+        if (mounted && i % 10 == 0) {
+          // 진행률 표시 (선택사항)
+          setState(() {
+            _statusText = 'Raw 프레임 병합 중... ${i + 1}/${rawFiles.length}';
+          });
+        }
       }
       await sink.close();
       print('🎬 Raw 프레임 병합 완료: $concatenatedRawPath');
-      
+
       // 4. FFmpeg 명령어 구성 (Raw 비디오 입력 사용)
       setState(() {
-          _statusText = 'FFmpeg으로 동영상 합성 중...';
+        _statusText = 'FFmpeg으로 동영상 합성 중...';
       });
       final documentsDir = await getApplicationDocumentsDirectory();
       final outputPath =
@@ -853,19 +876,24 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
       final audioFile = File(audioPath);
 
       String command;
-      final videoInput = '-f rawvideo -pixel_format rgba -video_size $videoSize -framerate ${actualFps.toStringAsFixed(2)} -i "$concatenatedRawPath"';
-      final videoOutput = '-c:v libx264 -pix_fmt yuv420p -preset ultrafast -vf "scale=360:696"'; // yuv420p는 호환성이 좋음
+      final videoInput =
+          '-f rawvideo -pixel_format rgba -video_size $videoSize -framerate ${actualFps.toStringAsFixed(2)} -i "$concatenatedRawPath"';
+      // 오디오 볼륨을 2.5배 증폭시키는 필터 추가
+      final audioFilter = '-af "volume=2.5"';
+      final videoOutput =
+          '-c:v libx264 -pix_fmt yuv420p -preset ultrafast -vf "scale=360:696"'; // yuv420p는 호환성이 좋음
 
       if (audioFile.existsSync() && audioFile.lengthSync() > 0) {
-        // 오디오 + 비디오
-        command = '$videoInput -i "$audioPath" $videoOutput -c:a aac "$outputPath"';
-        print('🎬 🎵 오디오+비디오(Raw) 합성 모드');
+        // 오디오 + 비디오 (볼륨 필터 적용)
+        command =
+            '$videoInput -i "$audioPath" $audioFilter $videoOutput -c:a aac "$outputPath"';
+        print('🎬 🎵 오디오+비디오(Raw) 합성 모드 (볼륨 2.5x 증폭)');
       } else {
         // 비디오 전용
         command = '$videoInput $videoOutput "$outputPath"';
         print('🎬 📹 비디오(Raw) 전용 합성 모드');
       }
-      
+
       print('🎬 명령어: $command');
 
       // 5. FFmpeg 실행 (기존 코드와 유사)
@@ -874,6 +902,10 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
 
       if (ReturnCode.isSuccess(returnCode)) {
         print('\x1b[92m🎉 동영상 합성 성공! (Raw 직접 처리) 🎉\x1b[0m');
+
+        // 동영상 생성 성공 후 캡처한 프레임 파일들 정리
+        await _cleanupRawFrames();
+
         setState(() {
           _isProcessing = false;
           _isConverting = false;
@@ -910,7 +942,6 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
         print('🎬 에러 로그: ${await session.getFailStackTrace()}');
         throw Exception('FFmpeg 실행 실패');
       }
-
     } catch (e) {
       print('❌ 동영상 합성 중 치명적 오류: $e');
       setState(() {
@@ -930,11 +961,43 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
     return chunks;
   }
 
-  // 임시 파일 정리
+  // Raw 프레임 파일들 정리 (동영상 생성 성공 후)
+  Future<void> _cleanupRawFrames() async {
+    try {
+      if (_sessionDirectory != null && _sessionDirectory!.existsSync()) {
+        final files = _sessionDirectory!.listSync();
+        int deletedCount = 0;
+        int totalSize = 0;
+
+        for (final file in files) {
+          if (file is File) {
+            final fileName = file.path.split('/').last;
+            // .raw 파일과 병합된 video.raw 파일 삭제
+            if (fileName.endsWith('.raw')) {
+              final fileSize = await file.length();
+              totalSize += fileSize;
+              await file.delete();
+              deletedCount++;
+              print(
+                  '🗑️ 삭제됨: $fileName (${(fileSize / (1024 * 1024)).toStringAsFixed(1)}MB)');
+            }
+          }
+        }
+
+        print(
+            '🗑️ Raw 프레임 정리 완료: $deletedCount개 파일, ${(totalSize / (1024 * 1024)).toStringAsFixed(1)}MB 절약');
+      }
+    } catch (e) {
+      print('🗑️ Raw 프레임 정리 오류: $e');
+    }
+  }
+
+  // 임시 파일 정리 (전체 세션 디렉토리 삭제)
   Future<void> _cleanupTempFiles() async {
     try {
       if (_sessionDirectory != null && _sessionDirectory!.existsSync()) {
         await _sessionDirectory!.delete(recursive: true);
+        print('🗑️ 세션 디렉토리 전체 삭제 완료');
       }
     } catch (e) {
       print('임시 파일 정리 오류: $e');
