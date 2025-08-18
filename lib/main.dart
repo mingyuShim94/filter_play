@@ -15,6 +15,7 @@ void main() {
   }, zoneSpecification: ZoneSpecification(
     print: (Zone self, ZoneDelegate parent, Zone zone, String message) {
       // 🎬 로그만 허용
+
       if (message.contains('🎬')) {
         parent.print(zone, message);
       }
