@@ -1,0 +1,119 @@
+{
+  "gameId": "all_characters",
+  "version": "1.0.0",
+  "gameTitle": "좋아하는 캐릭터",
+  "description": "다양한 캐릭터 중 좋아하는 순위를 정해보세요",
+  "gameType": "ranking",
+  "isEnabled": true,
+  "thumbnailAsset": "character_abby",
+  "baseUrl": "https://pub-a9df921416264d0199fb78dad1f43e02.r2.dev",
+  "assets": [
+    {
+      "type": "image",
+      "key": "character_abby",
+      "name": "애비",
+      "url": "kpop_demon_hunters/abby.webp"
+    },
+    {
+      "type": "image",
+      "key": "character_baby",
+      "name": "베이비",
+      "url": "kpop_demon_hunters/baby.webp"
+    },
+    {
+      "type": "image",
+      "key": "character_bobby",
+      "name": "바비",
+      "url": "kpop_demon_hunters/bobby.webp"
+    },
+    {
+      "type": "image",
+      "key": "character_duffy",
+      "name": "더피",
+      "url": "kpop_demon_hunters/duffy.webp"
+    },
+    {
+      "type": "image",
+      "key": "character_jinu",
+      "name": "진우",
+      "url": "kpop_demon_hunters/jinu.webp"
+    },
+    {
+      "type": "image",
+      "key": "character_mira",
+      "name": "미라",
+      "url": "kpop_demon_hunters/mira.webp"
+    },
+    {
+      "type": "image",
+      "key": "character_mystery",
+      "name": "미스터리",
+      "url": "kpop_demon_hunters/mystery.webp"
+    },
+    {
+      "type": "image",
+      "key": "character_romance",
+      "name": "로맨스",
+      "url": "kpop_demon_hunters/romance.webp"
+    },
+    {
+      "type": "image",
+      "key": "character_rumi",
+      "name": "루미",
+      "url": "kpop_demon_hunters/rumi.webp"
+    },
+    {
+      "type": "image",
+      "key": "character_zoey",
+      "name": "조이",
+      "url": "kpop_demon_hunters/zoey.webp"
+    }
+  ],
+  "characters": [
+    {
+      "id": "abby",
+      "assetKey": "character_abby"
+    },
+    {
+      "id": "baby",
+      "assetKey": "character_baby"
+    },
+    {
+      "id": "bobby",
+      "assetKey": "character_bobby"
+    },
+    {
+      "id": "duffy",
+      "assetKey": "character_duffy"
+    },
+    {
+      "id": "jinu",
+      "assetKey": "character_jinu"
+    },
+    {
+      "id": "mira",
+      "assetKey": "character_mira"
+    },
+    {
+      "id": "mystery",
+      "assetKey": "character_mystery"
+    },
+    {
+      "id": "romance",
+      "assetKey": "character_romance"
+    },
+    {
+      "id": "rumi",
+      "assetKey": "character_rumi"
+    },
+    {
+      "id": "zoey",
+      "assetKey": "character_zoey"
+    }
+  ],
+  "ui": {
+    "slotCount": 10,
+    "gridColumns": 2,
+    "aspectRatio": 0.65
+  }
+}

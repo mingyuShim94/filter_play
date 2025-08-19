@@ -1,7 +1,9 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/ranking_item.dart';
 import '../providers/ranking_game_provider.dart';
+import '../providers/asset_provider.dart';
 
 class RankingSlotPanel extends ConsumerWidget {
   final VoidCallback? onSlotTap;
@@ -205,29 +207,72 @@ class RankingSlotWidget extends StatelessWidget {
   Widget _buildSelectedSlot() {
     return ClipRRect(
       borderRadius: BorderRadius.circular(13), // 컨테이너보다 살짝 작게
-      child: item!.imagePath != null
-          ? Image.asset(
-              item!.imagePath!,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) {
-                return Container(
-                  color: Colors.white24,
-                  child: const Icon(
-                    Icons.person,
-                    size: 32,
-                    color: Colors.white60,
-                  ),
-                );
-              },
-            )
-          : Container(
-              color: Colors.white24,
-              child: const Icon(
-                Icons.person,
-                size: 32,
-                color: Colors.white60,
-              ),
-            ),
+      child: _buildItemImage(),
+    );
+  }
+
+  // 이미지 빌드 - 다운로드된 이미지 우선, 없으면 assets 이미지 사용
+  Widget _buildItemImage() {
+    if (item?.assetKey != null) {
+      // assetKey가 있으면 다운로드된 이미지 시도
+      return Consumer(
+        builder: (context, ref, child) {
+          final assetNotifier = ref.read(assetProvider.notifier);
+          
+          return FutureBuilder<String?>(
+            future: assetNotifier.getLocalAssetPath('kpop_demon_hunters', 'kpop_demon_hunters/${item!.assetKey!.replaceFirst('character_', '')}.png'),
+            builder: (context, snapshot) {
+              if (snapshot.hasData && snapshot.data != null) {
+                final localPath = snapshot.data!;
+                final file = File(localPath);
+                
+                if (file.existsSync()) {
+                  return Image.file(
+                    file,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) {
+                      return _buildFallbackImage();
+                    },
+                  );
+                }
+              }
+              
+              // 다운로드된 이미지가 없으면 fallback 이미지 사용
+              return _buildFallbackImage();
+            },
+          );
+        },
+      );
+    } else {
+      // assetKey가 없으면 assets 이미지 시도
+      return _buildFallbackImage();
+    }
+  }
+
+  // Fallback 이미지 (assets 또는 기본 아이콘)
+  Widget _buildFallbackImage() {
+    if (item?.imagePath != null) {
+      return Image.asset(
+        item!.imagePath!,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          return _buildDefaultIcon();
+        },
+      );
+    } else {
+      return _buildDefaultIcon();
+    }
+  }
+
+  // 기본 아이콘
+  Widget _buildDefaultIcon() {
+    return Container(
+      color: Colors.white24,
+      child: const Icon(
+        Icons.person,
+        size: 32,
+        color: Colors.white60,
+      ),
     );
   }
 

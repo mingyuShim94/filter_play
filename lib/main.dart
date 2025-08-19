@@ -1,8 +1,8 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'screens/filter_list_screen.dart';
-import 'services/filter_data_service.dart';
+import 'screens/ranking_filter_list_screen.dart';
 
 void main() {
   // Flutter Zone을 사용하여 print 출력 필터링
@@ -43,9 +43,7 @@ class FilterPlayApp extends StatelessWidget {
         ),
       ),
       debugShowCheckedModeBanner: false,
-      home: FilterListScreen(
-        category: FilterDataService.getCategoryById('ranking')!,
-      ),
+      home: const RankingFilterListScreen(),
     );
   }
 }

@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:math';
 import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
@@ -142,9 +143,16 @@ class ForeheadRectangleService {
         _clearOldestCacheEntries();
       }
       
-      // AssetImage로부터 이미지 데이터 로딩
-      final ByteData data = await rootBundle.load(imagePath);
-      final Uint8List bytes = data.buffer.asUint8List();
+      // 이미지 데이터 로딩 (파일 시스템 또는 assets)
+      Uint8List bytes;
+      if (File(imagePath).existsSync()) {
+        // 로컬 파일에서 로딩
+        bytes = await File(imagePath).readAsBytes();
+      } else {
+        // Assets에서 로딩
+        final ByteData data = await rootBundle.load(imagePath);
+        bytes = data.buffer.asUint8List();
+      }
       
       // ui.Image로 디코딩
       final ui.Codec codec = await ui.instantiateImageCodec(bytes);

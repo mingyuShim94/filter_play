@@ -3,14 +3,16 @@ class RankingItem {
   final String name;
   final String emoji;
   final String description;
-  final String? imagePath; // assets 이미지 경로
+  final String? imagePath; // assets 이미지 경로 (fallback용)
+  final String? assetKey; // manifest.json의 asset key
 
   const RankingItem({
     required this.id,
     required this.name,
     required this.emoji,
     required this.description,
-    this.imagePath, // optional 이미지 경로
+    this.imagePath, // optional 이미지 경로 
+    this.assetKey, // optional asset key for downloaded images
   });
 
   RankingItem copyWith({
@@ -19,6 +21,7 @@ class RankingItem {
     String? emoji,
     String? description,
     String? imagePath,
+    String? assetKey,
   }) {
     return RankingItem(
       id: id ?? this.id,
@@ -26,6 +29,7 @@ class RankingItem {
       emoji: emoji ?? this.emoji,
       description: description ?? this.description,
       imagePath: imagePath ?? this.imagePath,
+      assetKey: assetKey ?? this.assetKey,
     );
   }
 
@@ -37,7 +41,8 @@ class RankingItem {
         other.name == name &&
         other.emoji == emoji &&
         other.description == description &&
-        other.imagePath == imagePath;
+        other.imagePath == imagePath &&
+        other.assetKey == assetKey;
   }
 
   @override
@@ -46,12 +51,13 @@ class RankingItem {
         name.hashCode ^
         emoji.hashCode ^
         description.hashCode ^
-        imagePath.hashCode;
+        imagePath.hashCode ^
+        assetKey.hashCode;
   }
 
   @override
   String toString() {
-    return 'RankingItem(id: $id, name: $name, emoji: $emoji, description: $description, imagePath: $imagePath)';
+    return 'RankingItem(id: $id, name: $name, emoji: $emoji, description: $description, imagePath: $imagePath, assetKey: $assetKey)';
   }
 
   // JSON 직렬화 (향후 확장용)
@@ -62,6 +68,7 @@ class RankingItem {
       'emoji': emoji,
       'description': description,
       'imagePath': imagePath,
+      'assetKey': assetKey,
     };
   }
 
@@ -72,6 +79,7 @@ class RankingItem {
       emoji: json['emoji'] as String,
       description: json['description'] as String,
       imagePath: json['imagePath'] as String?,
+      assetKey: json['assetKey'] as String?,
     );
   }
 }

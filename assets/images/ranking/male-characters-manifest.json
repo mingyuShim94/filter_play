@@ -1,0 +1,119 @@
+{
+  "gameId": "male_characters",
+  "version": "1.0.0",
+  "gameTitle": "좋아하는 남성 캐릭터",
+  "description": "매력적인 남성 캐릭터 중 좋아하는 순위를 정해보세요",
+  "gameType": "ranking",
+  "isEnabled": true,
+  "thumbnailAsset": "male_character_jinu",
+  "baseUrl": "https://pub-a9df921416264d0199fb78dad1f43e02.r2.dev",
+  "assets": [
+    {
+      "type": "image",
+      "key": "male_character_jinu",
+      "name": "진우",
+      "url": "male_characters/jinu.webp"
+    },
+    {
+      "type": "image",
+      "key": "male_character_bobby",
+      "name": "바비",
+      "url": "male_characters/bobby.webp"
+    },
+    {
+      "type": "image",
+      "key": "male_character_alex",
+      "name": "알렉스",
+      "url": "male_characters/alex.webp"
+    },
+    {
+      "type": "image",
+      "key": "male_character_daniel",
+      "name": "다니엘",
+      "url": "male_characters/daniel.webp"
+    },
+    {
+      "type": "image",
+      "key": "male_character_ryan",
+      "name": "라이언",
+      "url": "male_characters/ryan.webp"
+    },
+    {
+      "type": "image",
+      "key": "male_character_kevin",
+      "name": "케빈",
+      "url": "male_characters/kevin.webp"
+    },
+    {
+      "type": "image",
+      "key": "male_character_lucas",
+      "name": "루카스",
+      "url": "male_characters/lucas.webp"
+    },
+    {
+      "type": "image",
+      "key": "male_character_ethan",
+      "name": "이탄",
+      "url": "male_characters/ethan.webp"
+    },
+    {
+      "type": "image",
+      "key": "male_character_noah",
+      "name": "노아",
+      "url": "male_characters/noah.webp"
+    },
+    {
+      "type": "image",
+      "key": "male_character_leo",
+      "name": "레오",
+      "url": "male_characters/leo.webp"
+    }
+  ],
+  "characters": [
+    {
+      "id": "jinu",
+      "assetKey": "male_character_jinu"
+    },
+    {
+      "id": "bobby",
+      "assetKey": "male_character_bobby"
+    },
+    {
+      "id": "alex",
+      "assetKey": "male_character_alex"
+    },
+    {
+      "id": "daniel",
+      "assetKey": "male_character_daniel"
+    },
+    {
+      "id": "ryan",
+      "assetKey": "male_character_ryan"
+    },
+    {
+      "id": "kevin",
+      "assetKey": "male_character_kevin"
+    },
+    {
+      "id": "lucas",
+      "assetKey": "male_character_lucas"
+    },
+    {
+      "id": "ethan",
+      "assetKey": "male_character_ethan"
+    },
+    {
+      "id": "noah",
+      "assetKey": "male_character_noah"
+    },
+    {
+      "id": "leo",
+      "assetKey": "male_character_leo"
+    }
+  ],
+  "ui": {
+    "slotCount": 10,
+    "gridColumns": 2,
+    "aspectRatio": 0.65
+  }
+}

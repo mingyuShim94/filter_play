@@ -2,6 +2,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/filter_category.dart';
 import '../models/filter_item.dart';
 import '../services/filter_data_service.dart';
+import '../services/asset_cache_service.dart';
+import 'asset_provider.dart';
 
 class FilterState {
   final List<FilterCategory> categories;
@@ -55,22 +57,47 @@ class FilterState {
 }
 
 class FilterNotifier extends StateNotifier<FilterState> {
-  FilterNotifier() : super(const FilterState()) {
+  FilterNotifier(this._ref) : super(const FilterState()) {
     _loadCategories();
+    _setupDownloadCompleteCallback();
   }
 
-  void _loadCategories() {
+  final Ref _ref;
+
+  void _setupDownloadCompleteCallback() {
+    // AssetProvider의 다운로드 완료 콜백 설정
+    final assetNotifier = _ref.read(assetProvider.notifier);
+    assetNotifier.setDownloadCompleteCallback((filterId) async {
+      // 다운로드 완료 시 FilterProvider 상태 새로고침
+      await refreshCategories();
+    });
+  }
+
+  Future<void> _loadCategories() async {
     state = state.copyWith(isLoading: true);
-    
+
     try {
-      final categories = FilterDataService.getFilterCategories();
+      final categories = await FilterDataService.getFilterCategories();
+      final updatedCategories = <FilterCategory>[];
+
+      for (final category in categories) {
+        final updatedItems = <FilterItem>[];
+
+        for (final item in category.items) {
+          final cachedItem =
+              await AssetCacheService.loadFilterItemFromCache(item);
+          updatedItems.add(cachedItem);
+        }
+
+        updatedCategories.add(category.copyWith(items: updatedItems));
+      }
+
       state = state.copyWith(
-        categories: categories,
+        categories: updatedCategories,
         isLoading: false,
       );
     } catch (e) {
       state = state.copyWith(isLoading: false);
-      // TODO: 에러 처리 로직 추가
     }
   }
 
@@ -92,8 +119,32 @@ class FilterNotifier extends StateNotifier<FilterState> {
     );
   }
 
-  void refreshCategories() {
-    _loadCategories();
+  Future<void> refreshCategories() async {
+    await _loadCategories();
+  }
+
+  Future<void> startDownload(String filterId, String manifestPath) async {
+    final assetNotifier = _ref.read(assetProvider.notifier);
+    await assetNotifier.startDownload(filterId, manifestPath);
+    // 다운로드 시작 즉시 상태 새로고침
+    await refreshCategories();
+  }
+
+  void cancelDownload(String filterId) {
+    final assetNotifier = _ref.read(assetProvider.notifier);
+    assetNotifier.cancelDownload(filterId);
+  }
+
+  Future<void> deleteAssets(String filterId) async {
+    final assetNotifier = _ref.read(assetProvider.notifier);
+    await assetNotifier.deleteAssets(filterId);
+    await refreshCategories();
+  }
+
+  Future<void> retryDownload(String filterId, String manifestPath) async {
+    final assetNotifier = _ref.read(assetProvider.notifier);
+    await assetNotifier.retryDownload(filterId, manifestPath);
+    await refreshCategories();
   }
 
   // 편의 메서드들
@@ -114,14 +165,17 @@ class FilterNotifier extends StateNotifier<FilterState> {
 }
 
 // Provider 인스턴스
-final filterProvider = StateNotifierProvider<FilterNotifier, FilterState>((ref) {
-  return FilterNotifier();
+final filterProvider =
+    StateNotifierProvider<FilterNotifier, FilterState>((ref) {
+  return FilterNotifier(ref);
 });
 
 // 편의 Provider들
 final enabledCategoriesProvider = Provider<List<FilterCategory>>((ref) {
   final filterState = ref.watch(filterProvider);
-  return filterState.categories.where((category) => category.isEnabled).toList();
+  return filterState.categories
+      .where((category) => category.isEnabled)
+      .toList();
 });
 
 final selectedCategoryProvider = Provider<FilterCategory?>((ref) {

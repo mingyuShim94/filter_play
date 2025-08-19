@@ -1,83 +1,44 @@
 import '../models/ranking_item.dart';
+import '../models/asset_manifest.dart';
+import '../services/filter_data_service.dart';
 
 class RankingDataService {
-  // K-pop 멤버 데이터
-  static List<RankingItem> getKpopDemonHuntersCharacters() {
-    return [
-      const RankingItem(
-        id: 'abby',
-        name: '애비',
-        emoji: '',
-        description: '',
-        imagePath: 'assets/images/ranking/kpop_demon_hunters/abby.png',
-      ),
-      const RankingItem(
-        id: 'baby',
-        name: '베이비',
-        emoji: '',
-        description: '',
-        imagePath: 'assets/images/ranking/kpop_demon_hunters/baby.png',
-      ),
-      const RankingItem(
-        id: 'bobby',
-        name: '바비',
-        emoji: '',
-        description: '',
-        imagePath: 'assets/images/ranking/kpop_demon_hunters/bobby.png',
-      ),
-      const RankingItem(
-        id: 'duffy',
-        name: '더피',
-        emoji: '',
-        description: '',
-        imagePath: 'assets/images/ranking/kpop_demon_hunters/duffy.png',
-      ),
-      const RankingItem(
-        id: 'jinu',
-        name: '진우',
-        emoji: '',
-        description: '',
-        imagePath: 'assets/images/ranking/kpop_demon_hunters/jinu.png',
-      ),
-      const RankingItem(
-        id: 'mira',
-        name: '미라',
-        emoji: '',
-        description: '',
-        imagePath: 'assets/images/ranking/kpop_demon_hunters/mira.png',
-      ),
-      const RankingItem(
-        id: 'mystery',
-        name: '미스터리',
-        emoji: '',
-        description: '',
-        imagePath: 'assets/images/ranking/kpop_demon_hunters/mystery.png',
-      ),
-      const RankingItem(
-        id: 'romance',
-        name: '로맨스',
-        emoji: '',
-        description: '',
-        imagePath: 'assets/images/ranking/kpop_demon_hunters/romance.png',
-      ),
-      const RankingItem(
-        id: 'rumi',
-        name: '루미',
-        emoji: '',
-        description: '',
-        imagePath: 'assets/images/ranking/kpop_demon_hunters/rumi.png',
-      ),
-      const RankingItem(
-        id: 'zoey',
-        name: '조이',
-        emoji: '',
-        description: '',
-        imagePath: 'assets/images/ranking/kpop_demon_hunters/zoey.png',
-      ),
-    ];
+  // 동적으로 매니페스트에서 캐릭터 데이터 로드
+  static Future<List<RankingItem>> getCharactersByGameId(String gameId) async {
+    final manifest = await FilterDataService.getManifestByFilterId(gameId);
+    if (manifest == null) {
+      return [];
+    }
+    
+    return _convertCharactersToRankingItems(manifest);
   }
 
-  // 추가 랭킹 테마들 (향후 확장용)
+  // K-pop 멤버 데이터 (하위 호환성을 위해 유지)
+  static Future<List<RankingItem>> getKpopDemonHuntersCharacters() async {
+    return await getCharactersByGameId('kpop_demon_hunters');
+  }
+
+  // AssetManifest의 Character를 RankingItem으로 변환
+  static List<RankingItem> _convertCharactersToRankingItems(AssetManifest manifest) {
+    return manifest.characters.map((character) {
+      // assets에서 해당 캐릭터의 asset 정보 찾기
+      final asset = manifest.getAssetByKey(character.assetKey);
+      
+      return RankingItem(
+        id: character.id,
+        name: asset?.name ?? character.id, // asset의 name 사용, 없으면 id 사용
+        emoji: '', // 빈 문자열
+        description: '', // 빈 문자열
+        imagePath: asset != null 
+            ? 'assets/images/ranking/${manifest.gameId}/${character.id}.png' // fallback용 assets 경로
+            : null,
+        assetKey: character.assetKey,
+      );
+    }).toList();
+  }
+
+
+  // 추가 랭킹 테마들 (향후 확장용) - 정적 유지
   static List<RankingItem> getFoodRankingItems() {
     return [
       const RankingItem(
@@ -143,22 +104,28 @@ class RankingDataService {
     ];
   }
 
-  // 게임 테마별 데이터 반환
-  static List<RankingItem> getRankingItemsByTheme(String theme) {
+  // 게임 테마별 데이터 반환 (동적 + 정적 혼합)
+  static Future<List<RankingItem>> getRankingItemsByTheme(String theme) async {
     switch (theme) {
       case 'kpop_demon_hunters':
-        return getKpopDemonHuntersCharacters();
+        return await getKpopDemonHuntersCharacters();
       case 'food_ranking':
         return getFoodRankingItems();
       case 'movie_ranking':
         return getMovieRankingItems();
       default:
-        return getKpopDemonHuntersCharacters(); // 기본값
+        // 동적으로 게임 ID로 검색 시도
+        final items = await getCharactersByGameId(theme);
+        if (items.isNotEmpty) {
+          return items;
+        }
+        // 기본값
+        return await getKpopDemonHuntersCharacters();
     }
   }
 
-  // 테마 이름 반환
-  static String getThemeDisplayName(String theme) {
+  // 테마 이름 반환 (동적 + 정적 혼합)
+  static Future<String> getThemeDisplayName(String theme) async {
     switch (theme) {
       case 'kpop_demon_hunters':
         return 'K-pop 멤버 랭킹';
@@ -167,16 +134,22 @@ class RankingDataService {
       case 'movie_ranking':
         return '영화 장르 랭킹';
       default:
-        return '랭킹 게임';
+        // 동적으로 매니페스트에서 이름 찾기
+        final manifest = await FilterDataService.getManifestByFilterId(theme);
+        return manifest?.gameTitle ?? '랭킹 게임';
     }
   }
 
-  // 사용 가능한 테마 목록
-  static List<String> getAvailableThemes() {
-    return [
+  // 사용 가능한 테마 목록 (동적 + 정적 혼합)
+  static Future<List<String>> getAvailableThemes() async {
+    final List<String> themes = [
       'kpop_demon_hunters',
       'food_ranking',
       'movie_ranking',
     ];
+    
+    // TODO: 향후 동적으로 매니페스트에서 추가 테마들 로드
+    
+    return themes;
   }
 }

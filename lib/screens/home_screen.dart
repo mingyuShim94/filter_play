@@ -1,7 +1,7 @@
+import 'package:filterplay/screens/ranking_filter_list_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'settings_screen.dart';
-import 'filter_list_screen.dart';
 import '../providers/permission_provider.dart';
 import '../providers/filter_provider.dart';
 import '../models/filter_category.dart';
@@ -38,7 +38,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => FilterListScreen(category: category),
+          builder: (context) => RankingFilterListScreen(category: category),
         ),
       );
     }

@@ -5,6 +5,13 @@ enum GameType {
   quiz, // 퀴즈/상식
 }
 
+enum DownloadStatus {
+  notDownloaded,
+  downloading,
+  downloaded,
+  failed,
+}
+
 class FilterItem {
   final String id;
   final String name;
@@ -12,6 +19,9 @@ class FilterItem {
   final String? imageUrl;
   final GameType gameType;
   final bool isEnabled;
+  final DownloadStatus downloadStatus;
+  final double downloadProgress;
+  final String? manifestPath;
 
   const FilterItem({
     required this.id,
@@ -20,6 +30,9 @@ class FilterItem {
     this.imageUrl,
     required this.gameType,
     required this.isEnabled,
+    this.downloadStatus = DownloadStatus.notDownloaded,
+    this.downloadProgress = 0.0,
+    this.manifestPath,
   });
 
   FilterItem copyWith({
@@ -29,6 +42,9 @@ class FilterItem {
     String? imageUrl,
     GameType? gameType,
     bool? isEnabled,
+    DownloadStatus? downloadStatus,
+    double? downloadProgress,
+    String? manifestPath,
   }) {
     return FilterItem(
       id: id ?? this.id,
@@ -37,8 +53,16 @@ class FilterItem {
       imageUrl: imageUrl ?? this.imageUrl,
       gameType: gameType ?? this.gameType,
       isEnabled: isEnabled ?? this.isEnabled,
+      downloadStatus: downloadStatus ?? this.downloadStatus,
+      downloadProgress: downloadProgress ?? this.downloadProgress,
+      manifestPath: manifestPath ?? this.manifestPath,
     );
   }
+
+  bool get isDownloaded => downloadStatus == DownloadStatus.downloaded;
+  bool get isDownloading => downloadStatus == DownloadStatus.downloading;
+  bool get downloadFailed => downloadStatus == DownloadStatus.failed;
+  bool get needsDownload => downloadStatus == DownloadStatus.notDownloaded || downloadStatus == DownloadStatus.failed;
 
   @override
   bool operator ==(Object other) {
@@ -49,7 +73,10 @@ class FilterItem {
         other.description == description &&
         other.imageUrl == imageUrl &&
         other.gameType == gameType &&
-        other.isEnabled == isEnabled;
+        other.isEnabled == isEnabled &&
+        other.downloadStatus == downloadStatus &&
+        other.downloadProgress == downloadProgress &&
+        other.manifestPath == manifestPath;
   }
 
   @override
@@ -59,11 +86,14 @@ class FilterItem {
         description.hashCode ^
         imageUrl.hashCode ^
         gameType.hashCode ^
-        isEnabled.hashCode;
+        isEnabled.hashCode ^
+        downloadStatus.hashCode ^
+        downloadProgress.hashCode ^
+        manifestPath.hashCode;
   }
 
   @override
   String toString() {
-    return 'FilterItem(id: $id, name: $name, gameType: $gameType, isEnabled: $isEnabled)';
+    return 'FilterItem(id: $id, name: $name, gameType: $gameType, isEnabled: $isEnabled, downloadStatus: $downloadStatus)';
   }
 }

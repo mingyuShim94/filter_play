@@ -18,6 +18,7 @@ import 'package:ffmpeg_kit_flutter_new/return_code.dart';
 import 'package:record/record.dart';
 import '../services/forehead_rectangle_service.dart';
 import '../providers/ranking_game_provider.dart';
+import '../providers/asset_provider.dart';
 import '../services/ranking_data_service.dart';
 import '../widgets/ranking_slot_panel.dart';
 import 'result_screen.dart';
@@ -85,9 +86,9 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
   }
 
   // 랭킹 게임 초기화
-  void _initializeRankingGame() {
+  void _initializeRankingGame() async {
     // K-pop 데몬 헌터스 랭킹 게임 시작
-    final characters = RankingDataService.getKpopDemonHuntersCharacters();
+    final characters = await RankingDataService.getKpopDemonHuntersCharacters();
     ref
         .read(rankingGameProvider.notifier)
         .startGame('kpop_demon_hunters', characters);
@@ -240,7 +241,23 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
 
           // 현재 선택된 랭킹 아이템의 이미지 경로 가져오기
           final currentRankingItem = ref.read(currentRankingItemProvider);
-          final imagePath = currentRankingItem?.imagePath;
+          String? imagePath;
+          
+          if (currentRankingItem?.assetKey != null) {
+            // 다운로드된 이미지 경로 시도
+            final assetNotifier = ref.read(assetProvider.notifier);
+            imagePath = await assetNotifier.getLocalAssetPath(
+              'kpop_demon_hunters', 
+              'kpop_demon_hunters/${currentRankingItem!.assetKey!.replaceFirst('character_', '')}.png'
+            );
+            
+            // 다운로드된 이미지가 없으면 fallback
+            if (imagePath == null || !File(imagePath).existsSync()) {
+              imagePath = currentRankingItem.imagePath;
+            }
+          } else {
+            imagePath = currentRankingItem?.imagePath;
+          }
 
           foreheadRectangle =
               await ForeheadRectangleService.calculateForeheadRectangle(

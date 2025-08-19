@@ -1,0 +1,31 @@
+{
+  "version": "1.0.0",
+  "lastUpdated": "2024-08-19T12:00:00Z",
+  "baseUrl": "https://pub-a9df921416264d0199fb78dad1f43e02.r2.dev",
+  "filters": [
+    {
+      "gameId": "all_characters",
+      "manifestUrl": "all_characters/all-characters-manifest.json",
+      "category": "ranking",
+      "isEnabled": true
+    },
+    {
+      "gameId": "male_characters",
+      "manifestUrl": "male_characters/male-characters-manifest.json",
+      "category": "ranking",
+      "isEnabled": true
+    },
+    {
+      "gameId": "female_characters",
+      "manifestUrl": "female_characters/female-characters-manifest.json",
+      "category": "ranking",
+      "isEnabled": true
+    },
+    {
+      "gameId": "travel_destinations",
+      "manifestUrl": "travel_destinations/travel-destinations-manifest.json",
+      "category": "ranking",
+      "isEnabled": true
+    }
+  ]
+}
