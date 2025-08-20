@@ -1,0 +1,119 @@
+{
+  "gameId": "travel_destinations",
+  "version": "1.0.0",
+  "gameTitle": "'케이팝 데몬 헌터스' 속 한국 명소",
+  "description": "애니메이션 '케이팝 데몬 헌터스'에 등장한 한국의 실제 장소들 중 가고싶은 순위를 정해보세요.",
+  "gameType": "ranking",
+  "isEnabled": true,
+  "thumbnailAsset": "destination_nseoultower",
+  "baseUrl": "https://pub-a9df921416264d0199fb78dad1f43e02.r2.dev",
+  "assets": [
+    {
+      "type": "image",
+      "key": "destination_hanuiwon",
+      "name": "한의원",
+      "url": "travel_destinations/hanuiwon.webp"
+    },
+    {
+      "type": "image",
+      "key": "destination_cheongdam_bridge",
+      "name": "청담대교",
+      "url": "travel_destinations/cheongdam_bridge.webp"
+    },
+    {
+      "type": "image",
+      "key": "destination_olympic_stadium",
+      "name": "올림픽경기장",
+      "url": "travel_destinations/olympic_stadium.webp"
+    },
+    {
+      "type": "image",
+      "key": "destination_gyeongbokgung",
+      "name": "경복궁",
+      "url": "travel_destinations/gyeongbokgung.webp"
+    },
+    {
+      "type": "image",
+      "key": "destination_lotteworldtower",
+      "name": "롯데월드타워(서울스카이)",
+      "url": "travel_destinations/lotteworldtower.webp"
+    },
+    {
+      "type": "image",
+      "key": "destination_bukchon_hanok",
+      "name": "북촌한옥마을",
+      "url": "travel_destinations/bukchon_hanok.webp"
+    },
+    {
+      "type": "image",
+      "key": "destination_naksan_park",
+      "name": "낙산공원",
+      "url": "travel_destinations/naksan_park.webp"
+    },
+    {
+      "type": "image",
+      "key": "destination_myeongdong",
+      "name": "명동",
+      "url": "travel_destinations/myeongdong.webp"
+    },
+    {
+      "type": "image",
+      "key": "destination_nseoultower",
+      "name": "N서울타워",
+      "url": "travel_destinations/nseoultower.webp"
+    },
+    {
+      "type": "image",
+      "key": "destination_kpop_square",
+      "name": "K-POP SQUARE MEDIA",
+      "url": "travel_destinations/kpop_square.webp"
+    }
+  ],
+  "characters": [
+    {
+      "id": "hanuiwon",
+      "assetKey": "destination_hanuiwon"
+    },
+    {
+      "id": "cheongdam_bridge",
+      "assetKey": "destination_cheongdam_bridge"
+    },
+    {
+      "id": "olympic_stadium",
+      "assetKey": "destination_olympic_stadium"
+    },
+    {
+      "id": "gyeongbokgung",
+      "assetKey": "destination_gyeongbokgung"
+    },
+    {
+      "id": "lotteworldtower",
+      "assetKey": "destination_lotteworldtower"
+    },
+    {
+      "id": "bukchon_hanok",
+      "assetKey": "destination_bukchon_hanok"
+    },
+    {
+      "id": "naksan_park",
+      "assetKey": "destination_naksan_park"
+    },
+    {
+      "id": "myeongdong",
+      "assetKey": "destination_myeongdong"
+    },
+    {
+      "id": "nseoultower",
+      "assetKey": "destination_nseoultower"
+    },
+    {
+      "id": "kpop_square",
+      "assetKey": "destination_kpop_square"
+    }
+  ],
+  "ui": {
+    "slotCount": 10,
+    "gridColumns": 2,
+    "aspectRatio": 0.65
+  }
+}

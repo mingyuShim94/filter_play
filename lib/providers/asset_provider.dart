@@ -4,6 +4,7 @@ import '../models/filter_item.dart';
 import '../models/asset_manifest.dart';
 import '../services/asset_download_service.dart';
 import '../services/asset_cache_service.dart';
+import '../services/filter_data_service.dart';
 
 class AssetDownloadState {
   final Map<String, DownloadStatus> downloadStatuses;
@@ -83,14 +84,15 @@ class AssetNotifier extends StateNotifier<AssetDownloadState> {
   Future<void> _initialize() async {
     try {
       await AssetCacheService.validateCache();
-      
+
       final downloadedGames = await AssetCacheService.getDownloadedGames();
       final Map<String, DownloadStatus> statuses = {};
       final Map<String, double> progresses = {};
 
       for (final gameId in downloadedGames) {
         statuses[gameId] = await AssetCacheService.getDownloadStatus(gameId);
-        progresses[gameId] = await AssetCacheService.getDownloadProgress(gameId);
+        progresses[gameId] =
+            await AssetCacheService.getDownloadProgress(gameId);
       }
 
       state = state.copyWith(
@@ -104,12 +106,27 @@ class AssetNotifier extends StateNotifier<AssetDownloadState> {
   }
 
   Future<void> startDownload(String filterId, String manifestPath) async {
+    print('🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥');
+    print('🚀🎊 다운로드 시작 요청: $filterId');
+    print('📍📦 매니페스트 경로: $manifestPath');
+    print('🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥');
+
     try {
       _updateDownloadStatus(filterId, DownloadStatus.downloading);
       _clearError(filterId);
 
-      final manifest = await AssetDownloadService.loadManifestFromAssets(manifestPath);
-      
+      // 원격 전용: FilterDataService를 통해 매니페스트 로드
+      print('📥 원격 매니페스트 로드 시도...');
+      final manifest = await FilterDataService.getManifestByFilterId(filterId);
+
+      if (manifest == null) {
+        print('❌ 매니페스트를 찾을 수 없음: $filterId');
+        throw Exception('매니페스트를 찾을 수 없습니다: $filterId');
+      }
+
+      print('✅ 매니페스트 로드 성공: ${manifest.gameTitle}');
+      print('📊 다운로드할 파일 수: ${manifest.assets.length}개');
+
       late StreamSubscription subscription;
       subscription = _createDownloadStream(manifest).listen(
         (progress) {
@@ -140,7 +157,7 @@ class AssetNotifier extends StateNotifier<AssetDownloadState> {
 
   Stream<DownloadProgress> _createDownloadStream(AssetManifest manifest) {
     late StreamController<DownloadProgress> controller;
-    
+
     controller = StreamController<DownloadProgress>(
       onListen: () async {
         try {
@@ -153,7 +170,7 @@ class AssetNotifier extends StateNotifier<AssetDownloadState> {
               return Stream.value(progress);
             },
           );
-          
+
           if (!controller.isClosed) {
             controller.close();
           }
@@ -188,7 +205,7 @@ class AssetNotifier extends StateNotifier<AssetDownloadState> {
     try {
       await AssetDownloadService.deleteGameAssets(filterId);
       await AssetCacheService.clearFilterCache(filterId);
-      
+
       _updateDownloadStatus(filterId, DownloadStatus.notDownloaded);
       _updateDownloadProgress(filterId, 0.0);
       _clearError(filterId);
@@ -205,11 +222,20 @@ class AssetNotifier extends StateNotifier<AssetDownloadState> {
     return await AssetDownloadService.getLocalAssetPath(gameId, assetUrl);
   }
 
-  Future<double> getDownloadSize(String manifestPath) async {
+  Future<double> getDownloadSize(String filterId) async {
+    print('📏 다운로드 크기 조회 요청: $filterId');
+
     try {
-      final manifest = await AssetDownloadService.loadManifestFromAssets(manifestPath);
+      // 원격 전용: FilterDataService를 통해 매니페스트 로드
+      final manifest = await FilterDataService.getManifestByFilterId(filterId);
+      if (manifest == null) {
+        print('❌ 매니페스트를 찾을 수 없음: $filterId');
+        return -1;
+      }
+
       return await AssetDownloadService.getDownloadSize(manifest);
     } catch (e) {
+      print('❌ 다운로드 크기 계산 실패: $e');
       return -1;
     }
   }
@@ -219,13 +245,14 @@ class AssetNotifier extends StateNotifier<AssetDownloadState> {
   }
 
   void _updateDownloadStatus(String filterId, DownloadStatus status) {
-    final newStatuses = Map<String, DownloadStatus>.from(state.downloadStatuses);
+    final newStatuses =
+        Map<String, DownloadStatus>.from(state.downloadStatuses);
     newStatuses[filterId] = status;
-    
+
     state = state.copyWith(downloadStatuses: newStatuses);
-    
+
     AssetCacheService.setDownloadStatus(filterId, status);
-    
+
     if (status == DownloadStatus.downloaded) {
       AssetCacheService.addDownloadedGame(filterId);
     }
@@ -234,7 +261,7 @@ class AssetNotifier extends StateNotifier<AssetDownloadState> {
   void _updateDownloadProgress(String filterId, double progress) {
     final newProgresses = Map<String, double>.from(state.downloadProgresses);
     newProgresses[filterId] = progress;
-    
+
     state = state.copyWith(downloadProgresses: newProgresses);
     AssetCacheService.setDownloadProgress(filterId, progress);
   }
@@ -254,6 +281,7 @@ class AssetNotifier extends StateNotifier<AssetDownloadState> {
   }
 
   Future<void> retryDownload(String filterId, String manifestPath) async {
+    print('🔄 다운로드 재시도: $filterId');
     _clearError(filterId);
     await startDownload(filterId, manifestPath);
   }
@@ -281,16 +309,19 @@ class AssetNotifier extends StateNotifier<AssetDownloadState> {
   }
 }
 
-final assetProvider = StateNotifierProvider<AssetNotifier, AssetDownloadState>((ref) {
+final assetProvider =
+    StateNotifierProvider<AssetNotifier, AssetDownloadState>((ref) {
   return AssetNotifier();
 });
 
-final downloadStatusProvider = Provider.family<DownloadStatus, String>((ref, filterId) {
+final downloadStatusProvider =
+    Provider.family<DownloadStatus, String>((ref, filterId) {
   final assetState = ref.watch(assetProvider);
   return assetState.getDownloadStatus(filterId);
 });
 
-final downloadProgressProvider = Provider.family<double, String>((ref, filterId) {
+final downloadProgressProvider =
+    Provider.family<double, String>((ref, filterId) {
   final assetState = ref.watch(assetProvider);
   return assetState.getDownloadProgress(filterId);
 });
@@ -300,12 +331,14 @@ final downloadErrorProvider = Provider.family<String?, String>((ref, filterId) {
   return assetState.getError(filterId);
 });
 
-final isGameDownloadedProvider = FutureProvider.family<bool, String>((ref, filterId) async {
+final isGameDownloadedProvider =
+    FutureProvider.family<bool, String>((ref, filterId) async {
   final notifier = ref.read(assetProvider.notifier);
   return await notifier.isGameDownloaded(filterId);
 });
 
-final downloadSizeProvider = FutureProvider.family<double, String>((ref, manifestPath) async {
+final downloadSizeProvider =
+    FutureProvider.family<double, String>((ref, filterId) async {
   final notifier = ref.read(assetProvider.notifier);
-  return await notifier.getDownloadSize(manifestPath);
+  return await notifier.getDownloadSize(filterId);
 });

@@ -1,0 +1,119 @@
+{
+  "gameId": "male_characters",
+  "version": "1.0.1",
+  "gameTitle": "'케이팝 데몬 헌터스' 남자 캐릭터",
+  "description": "애니메이션 '케이팝 데몬 헌터스'의 매력적인 남성 캐릭터 중 좋아하는 순위를 정해보세요.",
+  "gameType": "ranking",
+  "isEnabled": true,
+  "thumbnailAsset": "male_character_jinu",
+  "baseUrl": "https://pub-a9df921416264d0199fb78dad1f43e02.r2.dev",
+  "assets": [
+    {
+      "type": "image",
+      "key": "male_character_jinu",
+      "name": "진우",
+      "url": "male_characters/jinu.webp"
+    },
+    {
+      "type": "image",
+      "key": "male_character_romance_saja",
+      "name": "로맨스 사자",
+      "url": "male_characters/romance_saja.webp"
+    },
+    {
+      "type": "image",
+      "key": "male_character_mystery_saja",
+      "name": "미스터리 사자",
+      "url": "male_characters/mystery_saja.webp"
+    },
+    {
+      "type": "image",
+      "key": "male_character_abs_saja",
+      "name": "복근 사자",
+      "url": "male_characters/abs_saja.webp"
+    },
+    {
+      "type": "image",
+      "key": "male_character_baby_saja",
+      "name": "베이비 사자",
+      "url": "male_characters/baby_saja.webp"
+    },
+    {
+      "type": "image",
+      "key": "male_character_bobby",
+      "name": "바비",
+      "url": "male_characters/bobby.webp"
+    },
+    {
+      "type": "image",
+      "key": "male_character_healer_han",
+      "name": "힐러 한",
+      "url": "male_characters/healer_han.webp"
+    },
+    {
+      "type": "image",
+      "key": "male_character_gwi_ma",
+      "name": "귀마",
+      "url": "male_characters/gwi_ma.webp"
+    },
+    {
+      "type": "image",
+      "key": "male_character_muscular_fan",
+      "name": "근육질 팬",
+      "url": "male_characters/muscular_fan.webp"
+    },
+    {
+      "type": "image",
+      "key": "male_character_lightstick_demon",
+      "name": "응원봉 악귀",
+      "url": "male_characters/lightstick_demon.webp"
+    }
+  ],
+  "characters": [
+    {
+      "id": "jinu",
+      "assetKey": "male_character_jinu"
+    },
+    {
+      "id": "romance_saja",
+      "assetKey": "male_character_romance_saja"
+    },
+    {
+      "id": "mystery_saja",
+      "assetKey": "male_character_mystery_saja"
+    },
+    {
+      "id": "abs_saja",
+      "assetKey": "male_character_abs_saja"
+    },
+    {
+      "id": "baby_saja",
+      "assetKey": "male_character_baby_saja"
+    },
+    {
+      "id": "bobby",
+      "assetKey": "male_character_bobby"
+    },
+    {
+      "id": "healer_han",
+      "assetKey": "male_character_healer_han"
+    },
+    {
+      "id": "gwi_ma",
+      "assetKey": "male_character_gwi_ma"
+    },
+    {
+      "id": "muscular_fan",
+      "assetKey": "male_character_muscular_fan"
+    },
+    {
+      "id": "lightstick_demon",
+      "assetKey": "male_character_lightstick_demon"
+    }
+  ],
+  "ui": {
+    "slotCount": 10,
+    "gridColumns": 2,
+    "aspectRatio": 0.65
+  }
+}

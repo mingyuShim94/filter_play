@@ -1,0 +1,119 @@
+{
+  "gameId": "female_characters",
+  "version": "1.0.0",
+  "gameTitle": "좋아하는 '케이팝 데몬 헌터스' 여성 캐릭터",
+  "description": "매력적인 '케이팝 데몬 헌터스' 여성 캐릭터 중 좋아하는 순위를 정해보세요",
+  "gameType": "ranking",
+  "isEnabled": true,
+  "thumbnailAsset": "female_character_rumi",
+  "baseUrl": "https://pub-a9df921416264d0199fb78dad1f43e02.r2.dev",
+  "assets": [
+    {
+      "type": "image",
+      "key": "female_character_rumi",
+      "name": "루미",
+      "url": "female_characters/rumi.webp"
+    },
+    {
+      "type": "image",
+      "key": "female_character_mira",
+      "name": "미라",
+      "url": "female_characters/mira.webp"
+    },
+    {
+      "type": "image",
+      "key": "female_character_zoey",
+      "name": "조이",
+      "url": "female_characters/zoey.webp"
+    },
+    {
+      "type": "image",
+      "key": "female_character_celine",
+      "name": "셀린",
+      "url": "female_characters/celine.webp"
+    },
+    {
+      "type": "image",
+      "key": "female_character_ryu_miyeong",
+      "name": "자신을 인정한 루미",
+      "url": "female_characters/self_accepted_rumi.webp"
+    },
+    {
+      "type": "image",
+      "key": "female_character_half_demon_rumi",
+      "name": "반악귀화 루미",
+      "url": "female_characters/half_demon_rumi.webp"
+    },
+    {
+      "type": "image",
+      "key": "female_character_flight_attendant_demon",
+      "name": "승무원 악령",
+      "url": "female_characters/flight_attendant_demon.webp"
+    },
+    {
+      "type": "image",
+      "key": "female_character_young_rumi",
+      "name": "아줌마 팬",
+      "url": "female_characters/ajumma_fan.webp"
+    },
+    {
+      "type": "image",
+      "key": "female_character_jinu_little_fan",
+      "name": "진우 꼬마소녀팬",
+      "url": "female_characters/jinu_little_fan.webp"
+    },
+    {
+      "type": "image",
+      "key": "female_character_rumi_grandmother",
+      "name": "안경팬",
+      "url": "female_characters/glasses_fan.webp"
+    }
+  ],
+  "characters": [
+    {
+      "id": "rumi",
+      "assetKey": "female_character_rumi"
+    },
+    {
+      "id": "mira",
+      "assetKey": "female_character_mira"
+    },
+    {
+      "id": "zoey",
+      "assetKey": "female_character_zoey"
+    },
+    {
+      "id": "celine",
+      "assetKey": "female_character_celine"
+    },
+    {
+      "id": "self_accepted_rumi",
+      "assetKey": "female_character_ryu_miyeong"
+    },
+    {
+      "id": "half_demon_rumi",
+      "assetKey": "female_character_half_demon_rumi"
+    },
+    {
+      "id": "flight_attendant_demon",
+      "assetKey": "female_character_flight_attendant_demon"
+    },
+    {
+      "id": "ajumma_fan",
+      "assetKey": "female_character_young_rumi"
+    },
+    {
+      "id": "jinu_little_fan",
+      "assetKey": "female_character_jinu_little_fan"
+    },
+    {
+      "id": "glasses_fan",
+      "assetKey": "female_character_rumi_grandmother"
+    }
+  ],
+  "ui": {
+    "slotCount": 10,
+    "gridColumns": 2,
+    "aspectRatio": 0.65
+  }
+}

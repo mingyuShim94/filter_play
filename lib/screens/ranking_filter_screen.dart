@@ -17,8 +17,11 @@ import 'package:ffmpeg_kit_flutter_new/ffmpeg_kit.dart';
 import 'package:ffmpeg_kit_flutter_new/return_code.dart';
 import 'package:record/record.dart';
 import '../services/forehead_rectangle_service.dart';
+import '../services/filter_data_service.dart';
 import '../providers/ranking_game_provider.dart';
 import '../providers/asset_provider.dart';
+import '../providers/filter_provider.dart';
+import '../providers/image_path_provider.dart';
 import '../services/ranking_data_service.dart';
 import '../widgets/ranking_slot_panel.dart';
 import 'result_screen.dart';
@@ -87,11 +90,36 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
 
   // 랭킹 게임 초기화
   void _initializeRankingGame() async {
-    // K-pop 데몬 헌터스 랭킹 게임 시작
-    final characters = await RankingDataService.getKpopDemonHuntersCharacters();
-    ref
-        .read(rankingGameProvider.notifier)
-        .startGame('kpop_demon_hunters', characters);
+    print('🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮');
+    print('🎮🔥 랭킹 게임 초기화 시작');
+    print('🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮');
+    
+    // 현재 선택된 필터 정보 가져오기
+    final selectedFilter = ref.read(selectedFilterProvider);
+    
+    if (selectedFilter != null) {
+      print('🎮✅ 선택된 필터: ${selectedFilter.id} (${selectedFilter.name})');
+      
+      // 선택된 필터의 캐릭터 데이터 로드
+      final characters = await RankingDataService.getCharactersByGameId(selectedFilter.id);
+      
+      if (characters.isNotEmpty) {
+        print('🎮🎯 캐릭터 로드 성공: ${characters.length}개');
+        ref.read(rankingGameProvider.notifier).startGame(selectedFilter.id, characters);
+      } else {
+        print('🎮⚠️ 캐릭터 데이터가 없음, 기본값 사용');
+        // 기본값으로 폴백
+        final defaultCharacters = await RankingDataService.getKpopDemonHuntersCharacters();
+        ref.read(rankingGameProvider.notifier).startGame('all_characters', defaultCharacters);
+      }
+    } else {
+      print('🎮❌ 선택된 필터가 없음, 기본값 사용');
+      // 선택된 필터가 없으면 기본값 사용
+      final defaultCharacters = await RankingDataService.getKpopDemonHuntersCharacters();
+      ref.read(rankingGameProvider.notifier).startGame('all_characters', defaultCharacters);
+    }
+    
+    print('🎮🎉 랭킹 게임 초기화 완료');
   }
 
   @override
@@ -239,23 +267,18 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
         if (faces.isNotEmpty) {
           final firstFace = faces.first;
 
-          // 현재 선택된 랭킹 아이템의 이미지 경로 가져오기
+          // 현재 선택된 랭킹 아이템의 이미지 경로 가져오기 (단순화)
           final currentRankingItem = ref.read(currentRankingItemProvider);
+          final selectedFilter = ref.read(selectedFilterProvider);
           String? imagePath;
           
-          if (currentRankingItem?.assetKey != null) {
-            // 다운로드된 이미지 경로 시도
-            final assetNotifier = ref.read(assetProvider.notifier);
-            imagePath = await assetNotifier.getLocalAssetPath(
-              'kpop_demon_hunters', 
-              'kpop_demon_hunters/${currentRankingItem!.assetKey!.replaceFirst('character_', '')}.png'
-            );
-            
-            // 다운로드된 이미지가 없으면 fallback
-            if (imagePath == null || !File(imagePath).existsSync()) {
-              imagePath = currentRankingItem.imagePath;
-            }
+          if (currentRankingItem?.assetKey != null && selectedFilter != null) {
+            // 이미지 경로 Provider를 통한 단순화된 경로 계산
+            final imagePathProvider = ref.read(getImagePathProvider);
+            final pathResult = await imagePathProvider(selectedFilter.id, currentRankingItem!.assetKey!);
+            imagePath = pathResult.path ?? currentRankingItem.imagePath;
           } else {
+            // Fallback: 기본 이미지 경로 사용
             imagePath = currentRankingItem?.imagePath;
           }
 

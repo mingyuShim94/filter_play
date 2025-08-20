@@ -12,61 +12,61 @@
       "type": "image",
       "key": "character_abby",
       "name": "애비",
-      "url": "kpop_demon_hunters/abby.webp"
+      "url": "all_characters/abby.webp"
     },
     {
       "type": "image",
       "key": "character_baby",
       "name": "베이비",
-      "url": "kpop_demon_hunters/baby.webp"
+      "url": "all_characters/baby.webp"
     },
     {
       "type": "image",
       "key": "character_bobby",
       "name": "바비",
-      "url": "kpop_demon_hunters/bobby.webp"
+      "url": "all_characters/bobby.webp"
     },
     {
       "type": "image",
       "key": "character_duffy",
       "name": "더피",
-      "url": "kpop_demon_hunters/duffy.webp"
+      "url": "all_characters/duffy.webp"
     },
     {
       "type": "image",
       "key": "character_jinu",
       "name": "진우",
-      "url": "kpop_demon_hunters/jinu.webp"
+      "url": "all_characters/jinu.webp"
     },
     {
       "type": "image",
       "key": "character_mira",
       "name": "미라",
-      "url": "kpop_demon_hunters/mira.webp"
+      "url": "all_characters/mira.webp"
     },
     {
       "type": "image",
       "key": "character_mystery",
       "name": "미스터리",
-      "url": "kpop_demon_hunters/mystery.webp"
+      "url": "all_characters/mystery.webp"
     },
     {
       "type": "image",
       "key": "character_romance",
       "name": "로맨스",
-      "url": "kpop_demon_hunters/romance.webp"
+      "url": "all_characters/romance.webp"
     },
     {
       "type": "image",
       "key": "character_rumi",
       "name": "루미",
-      "url": "kpop_demon_hunters/rumi.webp"
+      "url": "all_characters/rumi.webp"
     },
     {
       "type": "image",
       "key": "character_zoey",
       "name": "조이",
-      "url": "kpop_demon_hunters/zoey.webp"
+      "url": "all_characters/zoey.webp"
     }
   ],
   "characters": [

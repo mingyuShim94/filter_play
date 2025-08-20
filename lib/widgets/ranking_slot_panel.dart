@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/ranking_item.dart';
 import '../providers/ranking_game_provider.dart';
-import '../providers/asset_provider.dart';
+import '../providers/filter_provider.dart';
+import '../providers/image_path_provider.dart';
 
 class RankingSlotPanel extends ConsumerWidget {
   final VoidCallback? onSlotTap;
@@ -59,7 +60,7 @@ class RankingSlotPanel extends ConsumerWidget {
   }
 }
 
-class RankingSlotWidget extends StatelessWidget {
+class RankingSlotWidget extends ConsumerWidget {
   final int rank;
   final RankingItem? item;
   final VoidCallback onTap;
@@ -74,13 +75,13 @@ class RankingSlotWidget extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final isEmpty = item == null;
 
     return GestureDetector(
       onTap: onTap,
       onLongPress: onLongPress,
-      child: isEmpty ? _buildEmptySlotLayout() : _buildSelectedSlotLayout(),
+      child: isEmpty ? _buildEmptySlotLayout() : _buildSelectedSlotLayout(ref),
     );
   }
 
@@ -132,7 +133,7 @@ class RankingSlotWidget extends StatelessWidget {
   }
 
   // 선택된 슬롯 레이아웃 - Row로 숫자 영역과 이미지 영역 분리
-  Widget _buildSelectedSlotLayout() {
+  Widget _buildSelectedSlotLayout(WidgetRef ref) {
     final rankColor = _getRankColor(rank);
     
     return Row(
@@ -196,7 +197,7 @@ class RankingSlotWidget extends StatelessWidget {
               ),
             ],
           ),
-          child: _buildSelectedSlot(),
+          child: _buildSelectedSlot(ref),
         ),
       ],
     );
@@ -204,49 +205,90 @@ class RankingSlotWidget extends StatelessWidget {
 
 
   // 선택된 슬롯 UI - 이미지만 표시 (숫자는 별도 영역에서 처리)
-  Widget _buildSelectedSlot() {
+  Widget _buildSelectedSlot(WidgetRef ref) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(13), // 컨테이너보다 살짝 작게
-      child: _buildItemImage(),
+      child: _buildItemImage(ref),
     );
   }
 
-  // 이미지 빌드 - 다운로드된 이미지 우선, 없으면 assets 이미지 사용
-  Widget _buildItemImage() {
+  // 이미지 빌드 - getImagePathProvider 사용하여 이마 위 이미지와 동일한 로직 적용
+  Widget _buildItemImage(WidgetRef ref) {
     if (item?.assetKey != null) {
-      // assetKey가 있으면 다운로드된 이미지 시도
-      return Consumer(
-        builder: (context, ref, child) {
-          final assetNotifier = ref.read(assetProvider.notifier);
-          
-          return FutureBuilder<String?>(
-            future: assetNotifier.getLocalAssetPath('kpop_demon_hunters', 'kpop_demon_hunters/${item!.assetKey!.replaceFirst('character_', '')}.png'),
-            builder: (context, snapshot) {
-              if (snapshot.hasData && snapshot.data != null) {
-                final localPath = snapshot.data!;
-                final file = File(localPath);
-                
+      // 현재 선택된 필터의 gameId 가져오기
+      final selectedFilter = ref.watch(selectedFilterProvider);
+      
+      if (selectedFilter != null) {
+        print('🎯 [RankingSlot] 이미지 로딩 시작: gameId=${selectedFilter.id}, assetKey=${item!.assetKey}');
+        
+        // getImagePathProvider 사용하여 이마 위 이미지와 동일한 로직 적용
+        final imagePathProvider = ref.read(getImagePathProvider);
+        
+        return FutureBuilder<ImagePathResult>(
+          key: ValueKey('${selectedFilter.id}_${item!.assetKey}'), // 필터나 아이템 변경시 재빌드 보장
+          future: imagePathProvider(selectedFilter.id, item!.assetKey!),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              print('📍 [RankingSlot] 이미지 로딩 중...');
+              return _buildLoadingImage();
+            }
+            
+            if (snapshot.hasError) {
+              print('❌ [RankingSlot] 이미지 로딩 에러: ${snapshot.error}');
+              return _buildFallbackImage();
+            }
+            
+            if (snapshot.hasData) {
+              final pathResult = snapshot.data!;
+              print('✅ [RankingSlot] 이미지 경로 결과: local=${pathResult.localPath}, remote=${pathResult.remotePath}');
+              
+              // 로컬 이미지 우선 시도
+              if (pathResult.localPath != null) {
+                final file = File(pathResult.localPath!);
                 if (file.existsSync()) {
+                  print('✅ [RankingSlot] 로컬 이미지 사용: ${pathResult.localPath}');
                   return Image.file(
                     file,
                     fit: BoxFit.cover,
                     errorBuilder: (context, error, stackTrace) {
+                      print('❌ [RankingSlot] 로컬 이미지 로딩 실패: $error');
                       return _buildFallbackImage();
                     },
                   );
                 }
               }
               
-              // 다운로드된 이미지가 없으면 fallback 이미지 사용
-              return _buildFallbackImage();
-            },
-          );
-        },
-      );
+              // 리모트 이미지 시도
+              if (pathResult.remotePath != null) {
+                print('🌐 [RankingSlot] 리모트 이미지 시도: ${pathResult.remotePath}');
+                return Image.network(
+                  pathResult.remotePath!,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    print('❌ [RankingSlot] 리모트 이미지 로딩 실패: $error');
+                    return _buildFallbackImage();
+                  },
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return _buildLoadingImage();
+                  },
+                );
+              }
+            }
+            
+            print('⚠️ [RankingSlot] 모든 이미지 로딩 실패, fallback 사용');
+            return _buildFallbackImage();
+          },
+        );
+      } else {
+        print('⚠️ [RankingSlot] selectedFilter가 null, fallback 사용');
+      }
     } else {
-      // assetKey가 없으면 assets 이미지 시도
-      return _buildFallbackImage();
+      print('⚠️ [RankingSlot] assetKey가 null, fallback 사용');
     }
+    
+    // assetKey가 없거나 selectedFilter가 null이면 assets 이미지 시도
+    return _buildFallbackImage();
   }
 
   // Fallback 이미지 (assets 또는 기본 아이콘)
@@ -262,6 +304,23 @@ class RankingSlotWidget extends StatelessWidget {
     } else {
       return _buildDefaultIcon();
     }
+  }
+
+  // 로딩 중 이미지
+  Widget _buildLoadingImage() {
+    return Container(
+      color: Colors.white12,
+      child: const Center(
+        child: SizedBox(
+          width: 20,
+          height: 20,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            valueColor: AlwaysStoppedAnimation<Color>(Colors.white54),
+          ),
+        ),
+      ),
+    );
   }
 
   // 기본 아이콘

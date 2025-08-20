@@ -15,7 +15,8 @@ class RankingDataService {
 
   // K-pop 멤버 데이터 (하위 호환성을 위해 유지)
   static Future<List<RankingItem>> getKpopDemonHuntersCharacters() async {
-    return await getCharactersByGameId('kpop_demon_hunters');
+    // 원격 전용 시스템에서는 'all_characters' ID 사용
+    return await getCharactersByGameId('all_characters');
   }
 
   // AssetManifest의 Character를 RankingItem으로 변환
@@ -30,7 +31,7 @@ class RankingDataService {
         emoji: '', // 빈 문자열
         description: '', // 빈 문자열
         imagePath: asset != null 
-            ? 'assets/images/ranking/${manifest.gameId}/${character.id}.png' // fallback용 assets 경로
+            ? null // 원격 전용이므로 fallback 경로 제거 
             : null,
         assetKey: character.assetKey,
       );

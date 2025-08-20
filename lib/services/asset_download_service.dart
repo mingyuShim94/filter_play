@@ -5,6 +5,7 @@ import 'package:flutter/services.dart' hide AssetManifest;
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import '../models/asset_manifest.dart';
+import 'network_retry_service.dart';
 
 class DownloadProgress {
   final double progress;
@@ -94,6 +95,12 @@ class AssetDownloadService {
     AssetManifest manifest,
     Stream<DownloadProgress> Function(DownloadProgress) onProgress,
   ) async {
+    print('⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐');
+    print('🚀💥 게임 에셋 다운로드 시작: ${manifest.gameId} (${manifest.gameTitle})');
+    print('📍🔥 Base URL: ${manifest.baseUrl}');
+    print('📋⚡ 다운로드할 파일 수: ${manifest.assets.length}개');
+    print('⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐');
+    
     final assetsDir = await _getAssetsDirectory(manifest.gameId);
     final client = http.Client();
     
@@ -110,38 +117,82 @@ class AssetDownloadService {
         currentFile: '파일 크기 계산 중...',
       ));
 
+      // HEAD 요청으로 파일 크기 계산
+      print('📏 파일 크기 계산 시작...');
       for (final asset in manifest.assets) {
+        final url = manifest.getFullUrl(asset.url);
+        print('📏 크기 확인: ${asset.name} → $url');
+        
         try {
-          final url = manifest.getFullUrl(asset.url);
-          final headResponse = await client.head(Uri.parse(url)).timeout(_timeout);
+          final retryResult = await NetworkRetryService.retryHttpHead(
+            url,
+            timeout: _timeout,
+            config: const RetryConfig(
+              maxRetries: 1,
+              baseDelay: Duration(milliseconds: 500),
+            ),
+          );
           
-          if (headResponse.statusCode == 200) {
-            final contentLength = headResponse.headers['content-length'];
-            if (contentLength != null) {
-              totalBytes += int.parse(contentLength);
+          if (retryResult.isSuccess && retryResult.data != null) {
+            final headResponse = retryResult.data!;
+            print('   응답: ${headResponse.statusCode} (Content-Length: ${headResponse.headers['content-length'] ?? 'N/A'})');
+            
+            if (headResponse.statusCode == 200) {
+              final contentLength = headResponse.headers['content-length'];
+              if (contentLength != null) {
+                totalBytes += int.parse(contentLength);
+              }
             }
+          } else {
+            print('   ⚠️ HEAD 요청 실패: ${retryResult.error}');
           }
         } catch (e) {
-          // HEAD 요청 실패시 무시하고 계속 진행
+          print('   ❌ HEAD 요청 오류: $e');
           continue;
         }
       }
+      
+      print('📊 전체 예상 다운로드 크기: ${formatFileSize(totalBytes.toDouble())}');
 
+      // 실제 파일 다운로드
+      print('⬇️ 파일 다운로드 시작...');
       for (final asset in manifest.assets) {
         final url = manifest.getFullUrl(asset.url);
         final fileName = asset.url.split('/').last;
         final filePath = '$assetsDir/${asset.url}';
         final file = File(filePath);
 
+        print('📥 다운로드 중: ${asset.name} ($fileName)');
+        print('   URL: $url');
+        print('   저장 경로: $filePath');
+
         await file.parent.create(recursive: true);
 
         try {
-          final response = await client.get(Uri.parse(url)).timeout(_timeout);
+          final retryResult = await NetworkRetryService.retryHttpGet(
+            url,
+            timeout: _timeout,
+            config: const RetryConfig(
+              maxRetries: 2,
+              baseDelay: Duration(seconds: 1),
+            ),
+          );
+          
+          if (!retryResult.isSuccess || retryResult.data == null) {
+            throw Exception('파일 다운로드 실패: $url - ${retryResult.error}');
+          }
+          
+          final response = retryResult.data!;
+          print('   HTTP 응답: ${response.statusCode} ${response.reasonPhrase ?? ''}');
+          print('   응답 크기: ${response.bodyBytes.length} bytes');
+          print('   Content-Type: ${response.headers['content-type'] ?? 'N/A'}');
           
           if (response.statusCode == 200) {
             await file.writeAsBytes(response.bodyBytes);
             downloadedBytes += response.bodyBytes.length;
             downloadedFiles++;
+            
+            print('   ✅ 파일 저장 완료: ${response.bodyBytes.length}B');
 
             final progress = DownloadProgress(
               progress: downloadedFiles / totalFiles,
@@ -152,9 +203,12 @@ class AssetDownloadService {
 
             onProgress(progress);
           } else {
+            print('   ❌ HTTP 오류: ${response.statusCode} ${response.reasonPhrase ?? ''}');
+            print('   응답 본문: ${response.body.length > 500 ? response.body.substring(0, 500) + '...' : response.body}');
             throw Exception('파일 다운로드 실패: $url (${response.statusCode})');
           }
         } catch (e) {
+          print('   ❌ 다운로드 최종 실패: $e');
           throw Exception('$fileName 다운로드 실패: $e');
         }
       }
@@ -239,6 +293,9 @@ class AssetDownloadService {
   }
 
   static Future<double> getDownloadSize(AssetManifest manifest) async {
+    print('📏 다운로드 크기 계산 시작: ${manifest.gameId}');
+    print('📍 Base URL: ${manifest.baseUrl}');
+    
     final client = http.Client();
     double totalSize = 0;
 
@@ -246,21 +303,32 @@ class AssetDownloadService {
       for (final asset in manifest.assets) {
         try {
           final url = manifest.getFullUrl(asset.url);
+          print('📏 크기 확인: ${asset.name} → $url');
+          
           final headResponse = await client.head(Uri.parse(url)).timeout(_timeout);
+          print('   응답: ${headResponse.statusCode} (Content-Length: ${headResponse.headers['content-length'] ?? 'N/A'})');
           
           if (headResponse.statusCode == 200) {
             final contentLength = headResponse.headers['content-length'];
             if (contentLength != null) {
-              totalSize += int.parse(contentLength);
+              final size = int.parse(contentLength);
+              totalSize += size;
+              print('   ✅ 크기: ${formatFileSize(size.toDouble())}');
+            } else {
+              print('   ⚠️ Content-Length 헤더 없음');
             }
+          } else {
+            print('   ❌ HTTP 오류: ${headResponse.statusCode}');
           }
         } catch (e) {
-          // 개별 파일 크기 조회 실패시 무시
+          print('   ❌ 크기 확인 실패: $e');
           continue;
         }
       }
+      
+      print('📊 총 다운로드 크기: ${formatFileSize(totalSize)}');
     } catch (e) {
-      // 전체 크기 조회 실패시 기본값 반환
+      print('❌ 전체 크기 계산 실패: $e');
       return -1;
     } finally {
       client.close();
