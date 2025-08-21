@@ -1,11 +1,6 @@
 {
   "gameId": "all_characters",
   "version": "1.0.0",
-  "gameTitle": "좋아하는 캐릭터",
-  "description": "다양한 캐릭터 중 좋아하는 순위를 정해보세요",
-  "gameType": "ranking",
-  "isEnabled": true,
-  "thumbnailAsset": "character_abby",
   "baseUrl": "https://pub-a9df921416264d0199fb78dad1f43e02.r2.dev",
   "assets": [
     {

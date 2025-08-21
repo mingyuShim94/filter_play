@@ -1,11 +1,6 @@
 {
   "gameId": "male_characters",
   "version": "1.0.1",
-  "gameTitle": "'케이팝 데몬 헌터스' 남자 캐릭터",
-  "description": "애니메이션 '케이팝 데몬 헌터스'의 매력적인 남성 캐릭터 중 좋아하는 순위를 정해보세요.",
-  "gameType": "ranking",
-  "isEnabled": true,
-  "thumbnailAsset": "male_character_jinu",
   "baseUrl": "https://pub-a9df921416264d0199fb78dad1f43e02.r2.dev",
   "assets": [
     {
@@ -16,27 +11,27 @@
     },
     {
       "type": "image",
-      "key": "male_character_romance_saja",
+      "key": "male_character_romance",
       "name": "로맨스 사자",
-      "url": "male_characters/romance_saja.webp"
+      "url": "male_characters/romance.webp"
     },
     {
       "type": "image",
-      "key": "male_character_mystery_saja",
+      "key": "male_character_mystery",
       "name": "미스터리 사자",
-      "url": "male_characters/mystery_saja.webp"
+      "url": "male_characters/mystery.webp"
     },
     {
       "type": "image",
-      "key": "male_character_abs_saja",
-      "name": "복근 사자",
-      "url": "male_characters/abs_saja.webp"
+      "key": "male_character_abby",
+      "name": "애비 사자",
+      "url": "male_characters/abby.webp"
     },
     {
       "type": "image",
-      "key": "male_character_baby_saja",
+      "key": "male_character_baby",
       "name": "베이비 사자",
-      "url": "male_characters/baby_saja.webp"
+      "url": "male_characters/baby.webp"
     },
     {
       "type": "image",
@@ -75,20 +70,20 @@
       "assetKey": "male_character_jinu"
     },
     {
-      "id": "romance_saja",
-      "assetKey": "male_character_romance_saja"
+      "id": "romance",
+      "assetKey": "male_character_romance"
     },
     {
-      "id": "mystery_saja",
-      "assetKey": "male_character_mystery_saja"
+      "id": "mystery",
+      "assetKey": "male_character_mystery"
     },
     {
-      "id": "abs_saja",
-      "assetKey": "male_character_abs_saja"
+      "id": "abs",
+      "assetKey": "male_character_abs"
     },
     {
-      "id": "baby_saja",
-      "assetKey": "male_character_baby_saja"
+      "id": "baby",
+      "assetKey": "male_character_baby"
     },
     {
       "id": "bobby",

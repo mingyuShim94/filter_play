@@ -94,8 +94,17 @@ class ForeheadRectangle {
 class ForeheadRectangleService {
   // 이마 위치 계산을 위한 비율 상수들 (안정적인 위치)
   static const double _foreheadYOffset = 0.45; // 눈 위로 얼굴 높이의 45% (더 위쪽 위치, 눈 안가림)
-  static const double _foreheadWidthRatio = 0.25; // 얼굴 너비의 25% (더 작은 정사각형)
-  static const double _foreheadHeightRatio = 0.25; // 얼굴 높이의 25% (정사각형 비율 유지)
+  
+  // 동적 크기 계산을 위한 상수들
+  static const double _baseForeheadSize = 0.25; // 기본 크기 비율 (얼굴 대비)
+  static const double _maxAspectRatio = 3.0; // 최대 가로세로 비율 (3:1 제한)
+  static const double _minAspectRatio = 0.33; // 최소 가로세로 비율 (1:3 제한)
+  
+  // 하위 호환성을 위한 기존 상수들 (사용하지 않음)
+  @Deprecated('Use dynamic sizing instead')
+  static const double _foreheadWidthRatio = 0.25; 
+  @Deprecated('Use dynamic sizing instead')
+  static const double _foreheadHeightRatio = 0.25;
   
   // 이미지 캐싱 (다중 이미지 지원)
   static final Map<String, ui.Image> _cachedTextureImages = {};
@@ -202,6 +211,44 @@ class ForeheadRectangleService {
     _loadingImages.clear();
   }
 
+  /// 이미지 비율에 따른 동적 크기 계산
+  static (double width, double height) _calculateDynamicSize({
+    required double faceWidth,
+    required double faceHeight,
+    required ui.Image? textureImage,
+  }) {
+    // 기본 크기 설정 (얼굴 크기 기반)
+    final avgFaceSize = (faceWidth + faceHeight) / 2.0;
+    final baseSize = avgFaceSize * _baseForeheadSize;
+    
+    if (textureImage == null) {
+      // 이미지가 없으면 정사각형 기본값 반환
+      print('🔲 [ForeheadRectangle] 텍스처 이미지 없음, 기본 정사각형 사용: ${baseSize.toStringAsFixed(1)}x${baseSize.toStringAsFixed(1)}');
+      return (baseSize, baseSize);
+    }
+    
+    // 이미지 원본 비율 계산
+    final imageAspectRatio = textureImage.width / textureImage.height;
+    final clampedRatio = imageAspectRatio.clamp(_minAspectRatio, _maxAspectRatio);
+    
+    late final double finalWidth;
+    late final double finalHeight;
+    
+    if (clampedRatio >= 1.0) {
+      // 가로가 더 긴 경우 (또는 정사각형)
+      finalWidth = baseSize * clampedRatio;
+      finalHeight = baseSize;
+    } else {
+      // 세로가 더 긴 경우
+      finalWidth = baseSize;
+      finalHeight = baseSize / clampedRatio;
+    }
+    
+    print('📐 [ForeheadRectangle] 동적 크기 계산: 원본=${textureImage.width}x${textureImage.height} (${imageAspectRatio.toStringAsFixed(2)}:1) → 최종=${finalWidth.toStringAsFixed(1)}x${finalHeight.toStringAsFixed(1)} (${(finalWidth/finalHeight).toStringAsFixed(2)}:1)');
+    
+    return (finalWidth, finalHeight);
+  }
+
   /// 얼굴 데이터로부터 이마 사각형 정보를 계산
   static Future<ForeheadRectangle?> calculateForeheadRectangle(Face face, CameraController controller, {String? imagePath}) async {
     try {
@@ -228,32 +275,7 @@ class ForeheadRectangleService {
       final faceWidth = faceRect.width;
       final faceHeight = faceRect.height;
       
-      // 이마 중심점 계산 (눈 중심에서 위로 오프셋)
-      final foreheadCenter = Point<double>(
-        eyeCenter.x,
-        eyeCenter.y - (faceHeight * _foreheadYOffset),
-      );
-      
-      // 사각형 크기 계산
-      final rectWidth = faceWidth * _foreheadWidthRatio;
-      final rectHeight = faceHeight * _foreheadHeightRatio;
-      
-      // 얼굴 크기 기반 스케일 계산
-      final avgFaceSize = (faceWidth + faceHeight) / 2.0;
-      final scale = _calculateScale(avgFaceSize);
-      
-      // 회전각 처리 - 디바이스 센서 orientation 보정 적용
-      final rawRotY = face.headEulerAngleY ?? 0.0;
-      final rawRotZ = face.headEulerAngleZ ?? 0.0;
-      
-      // 센서 orientation에 따른 보정된 각도 계산
-      final correctedRotY = _correctForDeviceOrientation(rawRotY, controller.description.sensorOrientation);
-      final correctedRotZ = _correctForDeviceOrientation(rawRotZ, controller.description.sensorOrientation);
-      
-      final rotY = _clampRotation(correctedRotY, _maxRotationY);
-      final rotZ = _clampRotation(correctedRotZ, _maxRotationZ);
-      
-      // 텍스처 이미지 로딩 (비동기이지만 캐싱되어 있다면 즉시 반환)
+      // 1단계: 텍스처 이미지 먼저 로딩 (크기 계산에 필요)
       ui.Image? textureImage;
       try {
         textureImage = await loadTextureImage(imagePath);
@@ -263,6 +285,34 @@ class ForeheadRectangleService {
         }
         textureImage = null;
       }
+      
+      // 2단계: 이마 중심점 계산 (눈 중심에서 위로 오프셋)
+      final foreheadCenter = Point<double>(
+        eyeCenter.x,
+        eyeCenter.y - (faceHeight * _foreheadYOffset),
+      );
+      
+      // 3단계: 동적 크기 계산 (이미지 비율 반영)
+      final (rectWidth, rectHeight) = _calculateDynamicSize(
+        faceWidth: faceWidth,
+        faceHeight: faceHeight,
+        textureImage: textureImage,
+      );
+      
+      // 4단계: 얼굴 크기 기반 스케일 계산
+      final avgFaceSize = (faceWidth + faceHeight) / 2.0;
+      final scale = _calculateScale(avgFaceSize);
+      
+      // 5단계: 회전각 처리 - 디바이스 센서 orientation 보정 적용
+      final rawRotY = face.headEulerAngleY ?? 0.0;
+      final rawRotZ = face.headEulerAngleZ ?? 0.0;
+      
+      // 센서 orientation에 따른 보정된 각도 계산
+      final correctedRotY = _correctForDeviceOrientation(rawRotY, controller.description.sensorOrientation);
+      final correctedRotZ = _correctForDeviceOrientation(rawRotZ, controller.description.sensorOrientation);
+      
+      final rotY = _clampRotation(correctedRotY, _maxRotationY);
+      final rotZ = _clampRotation(correctedRotZ, _maxRotationZ);
       
       final result = ForeheadRectangle.withCurrentTime(
         center: foreheadCenter,
@@ -331,6 +381,18 @@ class ForeheadRectangleService {
     print('Result: $result');
     print('HeadEulerAngleY: ${face.headEulerAngleY}');
     print('HeadEulerAngleZ: ${face.headEulerAngleZ}');
+    
+    // 동적 크기 계산 관련 추가 정보
+    if (result.textureImage != null) {
+      final img = result.textureImage!;
+      final aspectRatio = img.width / img.height;
+      final resultRatio = result.width / result.height;
+      print('텍스처 이미지: ${img.width}x${img.height} (비율: ${aspectRatio.toStringAsFixed(2)}:1)');
+      print('최종 사각형: ${result.width.toStringAsFixed(1)}x${result.height.toStringAsFixed(1)} (비율: ${resultRatio.toStringAsFixed(2)}:1)');
+    } else {
+      print('텍스처 이미지: 없음 (기본 정사각형 사용)');
+    }
+    print('===============================');
   }
   
   /// 이마 사각형 정보 출력 (디버깅용)

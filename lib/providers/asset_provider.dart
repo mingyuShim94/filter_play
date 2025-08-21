@@ -5,6 +5,7 @@ import '../models/asset_manifest.dart';
 import '../services/asset_download_service.dart';
 import '../services/asset_cache_service.dart';
 import '../services/filter_data_service.dart';
+import '../services/manifest_cache_service.dart';
 
 class AssetDownloadState {
   final Map<String, DownloadStatus> downloadStatuses;
@@ -137,6 +138,11 @@ class AssetNotifier extends StateNotifier<AssetDownloadState> {
           _updateDownloadProgress(filterId, 1.0);
           _downloadSubscriptions.remove(filterId);
           subscription.cancel();
+          
+          // 다운로드 완료 시 세션 캐시 제거 (이제 로컬 매니페스트 우선 사용)
+          final manifestCache = ManifestCacheService();
+          manifestCache.onFilterDownloaded(filterId);
+          
           // 다운로드 완료 콜백 호출
           _onDownloadComplete?.call(filterId);
         },

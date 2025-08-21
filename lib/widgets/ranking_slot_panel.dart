@@ -250,6 +250,7 @@ class RankingSlotWidget extends ConsumerWidget {
                   return Image.file(
                     file,
                     fit: BoxFit.cover,
+                    alignment: Alignment.topCenter,
                     errorBuilder: (context, error, stackTrace) {
                       print('❌ [RankingSlot] 로컬 이미지 로딩 실패: $error');
                       return _buildFallbackImage();
@@ -264,6 +265,7 @@ class RankingSlotWidget extends ConsumerWidget {
                 return Image.network(
                   pathResult.remotePath!,
                   fit: BoxFit.cover,
+                  alignment: Alignment.topCenter,
                   errorBuilder: (context, error, stackTrace) {
                     print('❌ [RankingSlot] 리모트 이미지 로딩 실패: $error');
                     return _buildFallbackImage();
@@ -297,6 +299,7 @@ class RankingSlotWidget extends ConsumerWidget {
       return Image.asset(
         item!.imagePath!,
         fit: BoxFit.cover,
+        alignment: Alignment.topCenter,
         errorBuilder: (context, error, stackTrace) {
           return _buildDefaultIcon();
         },

@@ -5,6 +5,7 @@ import 'package:flutter/services.dart' hide AssetManifest;
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import '../models/asset_manifest.dart';
+import '../models/master_manifest.dart';
 import 'network_retry_service.dart';
 
 class DownloadProgress {
@@ -346,6 +347,93 @@ class AssetDownloadService {
       return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
     } else {
       return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
+    }
+  }
+
+  // =================== 마스터 매니페스트 로컬 저장/로드 기능 ===================
+
+  static const String _masterManifestFileName = 'master-manifest.json';
+
+  /// 마스터 매니페스트를 앱 폴더에 저장
+  static Future<void> saveMasterManifest(MasterManifest manifest) async {
+    try {
+      final appDocuments = await getApplicationDocumentsDirectory();
+      final masterManifestFile = File('${appDocuments.path}/$_masterManifestFileName');
+      
+      final jsonString = json.encode(manifest.toJson());
+      await masterManifestFile.writeAsString(jsonString);
+      
+      print('✅ 마스터 매니페스트 로컬 저장 완료: ${masterManifestFile.path}');
+    } catch (e) {
+      print('❌ 마스터 매니페스트 저장 실패: $e');
+      throw Exception('마스터 매니페스트 저장 실패: $e');
+    }
+  }
+
+  /// 로컬에 저장된 마스터 매니페스트 로드
+  static Future<MasterManifest?> getLocalMasterManifest() async {
+    try {
+      final appDocuments = await getApplicationDocumentsDirectory();
+      final masterManifestFile = File('${appDocuments.path}/$_masterManifestFileName');
+      
+      if (!await masterManifestFile.exists()) {
+        print('📂 로컬 마스터 매니페스트 파일 없음: ${masterManifestFile.path}');
+        return null;
+      }
+      
+      final jsonString = await masterManifestFile.readAsString();
+      final jsonData = json.decode(jsonString) as Map<String, dynamic>;
+      final manifest = MasterManifest.fromJson(jsonData);
+      
+      print('✅ 로컬 마스터 매니페스트 로드 완료: ${manifest.filters.length}개 필터');
+      return manifest;
+    } catch (e) {
+      print('❌ 로컬 마스터 매니페스트 로드 실패: $e');
+      return null;
+    }
+  }
+
+  /// 로컬 마스터 매니페스트가 존재하는지 확인
+  static Future<bool> hasLocalMasterManifest() async {
+    try {
+      final appDocuments = await getApplicationDocumentsDirectory();
+      final masterManifestFile = File('${appDocuments.path}/$_masterManifestFileName');
+      return await masterManifestFile.exists();
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// 로컬 마스터 매니페스트 파일 삭제
+  static Future<void> deleteLocalMasterManifest() async {
+    try {
+      final appDocuments = await getApplicationDocumentsDirectory();
+      final masterManifestFile = File('${appDocuments.path}/$_masterManifestFileName');
+      
+      if (await masterManifestFile.exists()) {
+        await masterManifestFile.delete();
+        print('✅ 로컬 마스터 매니페스트 삭제 완료');
+      }
+    } catch (e) {
+      print('❌ 로컬 마스터 매니페스트 삭제 실패: $e');
+    }
+  }
+
+  /// 로컬 마스터 매니페스트의 수정 시간 확인
+  static Future<DateTime?> getLocalMasterManifestModifiedTime() async {
+    try {
+      final appDocuments = await getApplicationDocumentsDirectory();
+      final masterManifestFile = File('${appDocuments.path}/$_masterManifestFileName');
+      
+      if (!await masterManifestFile.exists()) {
+        return null;
+      }
+      
+      final stat = await masterManifestFile.stat();
+      return stat.modified;
+    } catch (e) {
+      print('❌ 로컬 마스터 매니페스트 수정 시간 확인 실패: $e');
+      return null;
     }
   }
 }

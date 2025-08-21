@@ -7,6 +7,7 @@ import '../models/asset_manifest.dart';
 import '../models/master_manifest.dart';
 import 'manifest_cache_service.dart';
 import 'network_retry_service.dart';
+import 'asset_download_service.dart';
 
 class FilterDataService {
   // 마스터 매니페스트 URL (Cloudflare R2)
@@ -45,19 +46,39 @@ class FilterDataService {
     return categories;
   }
 
-  /// 마스터 매니페스트를 로드하고 캐싱
+  /// 마스터 매니페스트를 로드 (로컬 파일 우선, 캐싱 적용)
   static Future<MasterManifest?> _loadMasterManifest() async {
+    // 1단계: 메모리 캐시 확인
     if (_cachedMasterManifest != null) {
-      print('🔄 캐시된 마스터 매니페스트 사용');
+      print('⚡ 메모리 캐시된 마스터 매니페스트 사용 (즉시 로드)');
       return _cachedMasterManifest;
     }
 
     print('🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀');
-    print('🌐🔥 원격 마스터 매니페스트 로드 시도: $_masterManifestUrl');
+    print('🔍 마스터 매니페스트 로드 시작 (로컬 파일 우선)');
     print('🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀');
     
+    // 2단계: 로컬 파일 우선 확인
     try {
-      // 원격 마스터 매니페스트 다운로드 시도 (재시도 적용)
+      final localManifest = await AssetDownloadService.getLocalMasterManifest();
+      if (localManifest != null) {
+        _cachedMasterManifest = localManifest;
+        print('📂✅ 로컬 마스터 매니페스트 로드 완료: ${localManifest.filters.length}개 필터 (네트워크 요청 없음)');
+        
+        // 백그라운드에서 업데이트 확인 (non-blocking)
+        _checkForMasterManifestUpdate();
+        
+        return _cachedMasterManifest;
+      }
+      print('📂 로컬 마스터 매니페스트 없음, 원격에서 다운로드 시도');
+    } catch (e) {
+      print('⚠️ 로컬 마스터 매니페스트 로드 실패: $e');
+    }
+
+    // 3단계: 원격에서 다운로드
+    try {
+      print('🌐 원격 마스터 매니페스트 다운로드: $_masterManifestUrl');
+      
       final retryResult = await NetworkRetryService.retryHttpGet(
         _masterManifestUrl,
         headers: {
@@ -77,21 +98,20 @@ class FilterDataService {
       
       final response = retryResult.data!;
       print('📥 HTTP Response: ${response.statusCode} (${response.reasonPhrase})');
-      print('📊 Response size: ${response.contentLength ?? response.body.length} bytes');
       
       if (response.statusCode == 200) {
-        try {
-          final jsonData = json.decode(response.body) as Map<String, dynamic>;
-          _cachedMasterManifest = MasterManifest.fromJson(jsonData);
-          print('🎉🎉🎉 ✅ 원격 마스터 매니페스트 로드 성공: ${_cachedMasterManifest!.filters.length}개 필터 🎉🎉🎉');
-          return _cachedMasterManifest;
-        } catch (parseError) {
-          print('❌ JSON 파싱 실패: $parseError');
-          print('📄 Response body preview: ${response.body.length > 200 ? response.body.substring(0, 200) + '...' : response.body}');
-        }
+        final jsonData = json.decode(response.body) as Map<String, dynamic>;
+        _cachedMasterManifest = MasterManifest.fromJson(jsonData);
+        
+        // 로컬에 저장 (비동기 실행)
+        AssetDownloadService.saveMasterManifest(_cachedMasterManifest!).catchError((e) {
+          print('⚠️ 마스터 매니페스트 로컬 저장 실패: $e');
+        });
+        
+        print('🌐✅ 원격 마스터 매니페스트 로드 성공: ${_cachedMasterManifest!.filters.length}개 필터');
+        return _cachedMasterManifest;
       } else {
         print('❌ HTTP 요청 실패: ${response.statusCode} ${response.reasonPhrase}');
-        print('📄 Error body: ${response.body}');
       }
     } catch (e) {
       print('❌ 원격 마스터 매니페스트 로드 실패: $e');
@@ -99,34 +119,69 @@ class FilterDataService {
         print('⏰ 네트워크 타임아웃 - 인터넷 연결을 확인해주세요');
       } else if (e.toString().contains('SocketException')) {
         print('🌐 네트워크 연결 실패 - DNS 또는 방화벽 문제일 수 있습니다');
-      } else if (e.toString().contains('HandshakeException')) {
-        print('🔒 SSL 인증서 문제');
       }
     }
 
-    print('🔄 폴백 모드로 전환');
-    // 폴백: 로컬 매니페스트 사용
-    return await _loadFallbackMasterManifest();
-  }
-
-  /// 원격 전용 환경을 위한 폴백 처리 (실제로는 null 반환)
-  static Future<MasterManifest?> _loadFallbackMasterManifest() async {
-    print('❌ 폴백 모드: 원격 전용 환경에서는 로컬 매니페스트가 없습니다');
-    print('💡 해결방안:');
-    print('   1. 인터넷 연결 상태를 확인하세요');
-    print('   2. Cloudflare R2 URL이 올바른지 확인하세요: $_masterManifestUrl');
-    print('   3. 방화벽이나 프록시 설정을 확인하세요');
-    
-    // 원격 전용 환경에서는 fallback 없음
+    print('❌ 마스터 매니페스트 로드 실패: 로컬과 원격 모두 사용할 수 없음');
     return null;
   }
 
-  /// 마스터 매니페스트에서 랭킹 필터들을 동적으로 로드
+  /// 백그라운드에서 마스터 매니페스트 업데이트 확인 (non-blocking)
+  static void _checkForMasterManifestUpdate() {
+    // 백그라운드에서 비동기 실행 (UI 블로킹 방지)
+    Future.delayed(Duration.zero, () async {
+      try {
+        print('🔄 백그라운드 마스터 매니페스트 업데이트 확인');
+        
+        // 원격에서 최신 버전 확인
+        final retryResult = await NetworkRetryService.retryHttpGet(
+          _masterManifestUrl,
+          headers: {
+            'Accept': 'application/json',
+            'Cache-Control': 'no-cache',
+          },
+          timeout: const Duration(seconds: 5), // 짧은 타임아웃
+          config: const RetryConfig(
+            maxRetries: 1,
+            baseDelay: Duration(milliseconds: 500),
+          ),
+        );
+        
+        if (retryResult.isSuccess && retryResult.data != null) {
+          final response = retryResult.data!;
+          if (response.statusCode == 200) {
+            final jsonData = json.decode(response.body) as Map<String, dynamic>;
+            final remoteManifest = MasterManifest.fromJson(jsonData);
+            
+            // 로컬 버전과 비교
+            if (_cachedMasterManifest != null && 
+                remoteManifest.version != _cachedMasterManifest!.version) {
+              print('🆕 새로운 마스터 매니페스트 버전 발견: ${remoteManifest.version}');
+              
+              // 메모리 캐시 업데이트
+              _cachedMasterManifest = remoteManifest;
+              
+              // 로컬 파일 업데이트
+              await AssetDownloadService.saveMasterManifest(remoteManifest);
+              print('✅ 마스터 매니페스트 백그라운드 업데이트 완료');
+            } else {
+              print('✅ 마스터 매니페스트가 최신 버전입니다');
+            }
+          }
+        }
+      } catch (e) {
+        print('⚠️ 백그라운드 업데이트 확인 실패: $e (무시됨)');
+        // 백그라운드 작업이므로 실패해도 앱 동작에 영향 없음
+      }
+    });
+  }
+
+  /// 마스터 매니페스트에서 랭킹 필터들을 동적으로 로드 (개별 매니페스트 다운로드 없이)
   static Future<List<FilterItem>> _loadRankingFilters() async {
     final List<FilterItem> filters = [];
     
     print('💎💎💎💎💎💎💎💎💎💎💎💎💎💎💎💎💎💎💎💎💎💎💎💎💎💎💎💎💎💎');
-    print('🔄🎯 랭킹 필터 로드 시작');
+    print('🔄🎯 랭킹 필터 로드 시작 (마스터 매니페스트 기반)');
     print('💎💎💎💎💎💎💎💎💎💎💎💎💎💎💎💎💎💎💎💎💎💎💎💎💎💎💎💎💎💎');
     
     final masterManifest = await _loadMasterManifest();
@@ -149,76 +204,22 @@ class FilterDataService {
         continue;
       }
       
-      try {
-        AssetManifest manifest;
-        final manifestUrl = masterManifest.getFullManifestUrl(filterInfo.manifestUrl);
-        
-        print('📥 개별 매니페스트 다운로드 시도: $manifestUrl');
-        
-        // 원격 매니페스트 로드 (재시도 적용)
-        final retryResult = await NetworkRetryService.retryHttpGet(
-          manifestUrl,
-          headers: {
-            'Accept': 'application/json',
-            'Cache-Control': 'no-cache',
-          },
-          timeout: const Duration(seconds: 15),
-          config: const RetryConfig(
-            maxRetries: 2,
-            baseDelay: Duration(seconds: 1),
-          ),
-        );
-        
-        if (!retryResult.isSuccess || retryResult.data == null) {
-          print('❌ 매니페스트 다운로드 실패: ${retryResult.error}');
-          continue;
-        }
-        
-        final response = retryResult.data!;
-        print('📋 매니페스트 응답: ${response.statusCode} (${response.contentLength ?? response.body.length}B)');
-        
-        if (response.statusCode == 200) {
-          final jsonData = json.decode(response.body) as Map<String, dynamic>;
-          manifest = AssetManifest.fromJson(jsonData);
-          print('✅ 매니페스트 파싱 성공: ${manifest.gameTitle}');
-        } else {
-          print('❌ 매니페스트 다운로드 실패: HTTP ${response.statusCode}');
-          print('📄 에러 응답: ${response.body}');
-          continue;
-        }
-        
-        // 매니페스트에서 FilterItem 생성
-        final filterItem = FilterItem(
-          id: manifest.gameId,
-          name: manifest.gameTitle,
-          description: manifest.description,
-          gameType: _parseGameType(manifest.gameType),
-          isEnabled: manifest.isEnabled,
-          manifestPath: filterInfo.manifestUrl,
-          imageUrl: manifest.thumbnailAsset != null 
-              ? manifest.getFullUrl(manifest.getAssetByKey(manifest.thumbnailAsset!)?.url ?? '')
-              : null,
-        );
-        
-        filters.add(filterItem);
-        print('✅ 필터 추가 완료: ${filterItem.name} (썸네일: ${filterItem.imageUrl != null ? '있음' : '없음'})');
-        
-      } catch (e) {
-        print('❌ 필터 처리 실패: ${filterInfo.gameId}');
-        print('   URL: ${masterManifest.getFullManifestUrl(filterInfo.manifestUrl)}');
-        print('   에러: $e');
-        
-        if (e.toString().contains('TimeoutException')) {
-          print('   → 네트워크 타임아웃');
-        } else if (e.toString().contains('FormatException')) {
-          print('   → JSON 형식 오류');
-        } else if (e.toString().contains('SocketException')) {
-          print('   → 네트워크 연결 실패');
-        }
-      }
+      // 마스터 매니페스트의 정보로 직접 FilterItem 생성 (네트워크 요청 없음)
+      final filterItem = FilterItem(
+        id: filterInfo.gameId,
+        name: filterInfo.filterTitle,
+        description: filterInfo.filterDescription,
+        gameType: _parseGameType(filterInfo.filterType),
+        isEnabled: filterInfo.isEnabled,
+        manifestPath: filterInfo.manifestUrl,
+        imageUrl: null, // 썸네일 제거됨
+      );
+      
+      filters.add(filterItem);
+      print('✅ 필터 추가 완료: ${filterItem.name} (네트워크 요청 없음)');
     }
     
-    print('🎯 랭킹 필터 로드 완료: ${filters.length}/${rankingFilters.length}개 성공');
+    print('🎯 랭킹 필터 로드 완료: ${filters.length}/${rankingFilters.length}개 성공 (즉시 로드)');
     return filters;
   }
   
@@ -368,11 +369,24 @@ class FilterDataService {
     }
   }
   
-  /// 필터 ID로 매니페스트 로드 (캐싱 적용)
+  /// 필터 ID로 매니페스트 로드 (로컬 우선 + 캐싱 적용)
   static Future<AssetManifest?> getManifestByFilterId(String filterId) async {
     print('🔍 매니페스트 검색: $filterId');
     
-    // 캐싱 서비스 사용
+    // 1순위: 로컬에 다운로드된 매니페스트 확인
+    try {
+      final localManifest = await AssetDownloadService.getLocalManifest(filterId);
+      if (localManifest != null) {
+        print('✅ 로컬 매니페스트 사용: $filterId (${localManifest.gameTitle})');
+        print('   → 네트워크 요청 없음, 완전 로컬');
+        return localManifest;
+      }
+      print('📂 로컬 매니페스트 없음, 원격 확인: $filterId');
+    } catch (e) {
+      print('⚠️ 로컬 매니페스트 로드 실패: $e');
+    }
+    
+    // 2순위: 메모리 캐시 및 원격 로드
     final manifestCache = ManifestCacheService();
     
     return await manifestCache.getOrLoadManifest(filterId, () async {
@@ -396,7 +410,7 @@ class FilterDataService {
       try {
         // 원격 매니페스트 로드 (재시도 적용)
         final manifestUrl = masterManifest.getFullManifestUrl(filterInfo.manifestUrl);
-        print('📥 매니페스트 다운로드: $manifestUrl');
+        print('📥 원격 매니페스트 다운로드: $manifestUrl');
         
         final retryResult = await NetworkRetryService.retryHttpGet(
           manifestUrl,
@@ -412,22 +426,34 @@ class FilterDataService {
         );
         
         if (!retryResult.isSuccess || retryResult.data == null) {
-          print('❌ 매니페스트 다운로드 최종 실패: ${retryResult.error}');
+          print('❌ 원격 매니페스트 다운로드 최종 실패: ${retryResult.error}');
           return null;
         }
         
         final response = retryResult.data!;
+        print('📊 HTTP 응답: ${response.statusCode} (Content-Length: ${response.contentLength ?? response.body.length}B)');
+        
         if (response.statusCode == 200) {
-          final jsonData = json.decode(response.body) as Map<String, dynamic>;
-          final manifest = AssetManifest.fromJson(jsonData);
-          print('✅ 매니페스트 로드 성공: ${manifest.gameTitle}');
-          return manifest;
+          try {
+            print('📄 JSON 파싱 시작...');
+            final jsonData = json.decode(response.body) as Map<String, dynamic>;
+            print('✅ JSON 파싱 성공: ${jsonData.keys.toList()}');
+            
+            print('🔧 AssetManifest 객체 생성 시작...');
+            final manifest = AssetManifest.fromJson(jsonData);
+            print('✅ 원격 매니페스트 로드 성공: ${manifest.gameId} (${manifest.assets.length}개 애셋)');
+            return manifest;
+          } catch (parseError) {
+            print('❌ JSON 파싱 실패: $parseError');
+            print('📄 응답 본문 미리보기: ${response.body.length > 500 ? response.body.substring(0, 500) + '...' : response.body}');
+            return null;
+          }
         } else {
           print('❌ HTTP 오류: ${response.statusCode} ${response.reasonPhrase}');
-          print('📄 응답: ${response.body}');
+          print('📄 에러 응답: ${response.body}');
         }
       } catch (e) {
-        print('❌ 매니페스트 로드 실패: ${filterInfo.manifestUrl}');
+        print('❌ 원격 매니페스트 로드 실패: ${filterInfo.manifestUrl}');
         print('   에러: $e');
         
         if (e.toString().contains('TimeoutException')) {
@@ -450,6 +476,11 @@ class FilterDataService {
   /// 마스터 매니페스트 강제 업데이트
   static Future<MasterManifest?> refreshMasterManifest() async {
     clearMasterManifestCache();
+    return await _loadMasterManifest();
+  }
+
+  /// 마스터 매니페스트 접근용 public 메서드
+  static Future<MasterManifest?> getMasterManifest() async {
     return await _loadMasterManifest();
   }
 }

@@ -307,73 +307,84 @@ class _RankingFilterListScreenState extends ConsumerState<RankingFilterListScree
     );
   }
 
-  // 동적 필터 그리드 생성
+  // 동적 필터 그리드 생성 (마스터 매니페스트 캐시 사용으로 즉시 로드)
   Widget _buildDynamicFilterGrid(WidgetRef ref, List<FilterItem> filters) {
     return FutureBuilder<Map<String, int>>(
       future: _calculateGridConfig(filters),
       builder: (context, snapshot) {
+        // 마스터 매니페스트가 이미 캐시되어 있어서 매우 빠르게 처리됨
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
+          // 간단한 로딩 표시 (마스터 매니페스트 캐시가 있으면 거의 즉시 완료)
+          return _buildGridWithConfig(ref, filters, {'columns': 2, 'aspectRatio': 65});
+        }
+        
+        if (snapshot.hasError) {
+          print('❌ 그리드 설정 계산 실패: ${snapshot.error}');
+          // 에러 시 기본 설정 사용
+          return _buildGridWithConfig(ref, filters, {'columns': 2, 'aspectRatio': 65});
         }
         
         final gridConfig = snapshot.data ?? {'columns': 2, 'aspectRatio': 65};
-        
-        return GridView.builder(
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: gridConfig['columns']!,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-            childAspectRatio: gridConfig['aspectRatio']! / 100.0,
-          ),
-          itemCount: filters.length,
-          itemBuilder: (context, index) {
-            final filter = filters[index];
-            return _FilterCard(
-              filter: filter,
-              onTap: () => _selectFilter(context, ref, filter),
-              onDownload: filter.manifestPath != null && filter.needsDownload
-                  ? () => _startDownload(context, ref, filter)
-                  : null,
-            );
-          },
+        return _buildGridWithConfig(ref, filters, gridConfig);
+      },
+    );
+  }
+
+  // 그리드 빌더 분리
+  Widget _buildGridWithConfig(WidgetRef ref, List<FilterItem> filters, Map<String, int> gridConfig) {
+    return GridView.builder(
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: gridConfig['columns']!,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+        childAspectRatio: gridConfig['aspectRatio']! / 100.0,
+      ),
+      itemCount: filters.length,
+      itemBuilder: (context, index) {
+        final filter = filters[index];
+        return _FilterCard(
+          filter: filter,
+          onTap: () => _selectFilter(context, ref, filter),
+          onDownload: filter.manifestPath != null && filter.needsDownload
+              ? () => _startDownload(context, ref, filter)
+              : null,
         );
       },
     );
   }
 
-  // 필터들의 매니페스트에서 최적의 그리드 설정 계산
+  // 마스터 매니페스트에서 그리드 설정 계산 (네트워크 요청 없음)
   Future<Map<String, int>> _calculateGridConfig(List<FilterItem> filters) async {
-    int totalColumns = 2; // 기본값
-    double totalAspectRatio = 0.65; // 기본값
-    int configCount = 0;
+    print('📊 그리드 설정 계산 시작: 마스터 매니페스트 defaultUIConfig 사용');
 
-    for (final filter in filters) {
-      if (filter.manifestPath != null) {
-        try {
-          final manifest = await FilterDataService.getManifestByFilterId(filter.id);
-          if (manifest?.uiConfig != null) {
-            totalColumns = manifest!.uiConfig!.gridColumns;
-            totalAspectRatio += manifest.uiConfig!.aspectRatio;
-            configCount++;
-          }
-        } catch (e) {
-          // 매니페스트 로드 실패 시 기본값 사용
-          continue;
-        }
+    try {
+      // 마스터 매니페스트에서 기본 UI 설정 가져오기
+      final masterManifest = await FilterDataService.getMasterManifest();
+      
+      if (masterManifest?.defaultUIConfig != null) {
+        final config = masterManifest!.defaultUIConfig;
+        final result = {
+          'columns': config.gridColumns,
+          'aspectRatio': (config.aspectRatio * 100).round(),
+        };
+        
+        print('✅ 마스터 매니페스트 UI 설정 적용: $result');
+        return result;
+      } else {
+        print('⚠️ 마스터 매니페스트에 defaultUIConfig 없음, 기본값 사용');
       }
+    } catch (e) {
+      print('❌ 마스터 매니페스트 로드 실패, 기본값 사용: $e');
     }
 
-    // 평균 계산 (만약 다수의 매니페스트가 있다면)
-    if (configCount > 0) {
-      totalAspectRatio = totalAspectRatio / configCount;
-    } else {
-      totalAspectRatio = 0.65; // 기본값
-    }
-
-    return {
-      'columns': totalColumns,
-      'aspectRatio': (totalAspectRatio * 100).round(),
+    // 기본값
+    final result = {
+      'columns': 2,
+      'aspectRatio': 65, // 0.65 * 100
     };
+
+    print('📊 기본 그리드 설정 사용: $result');
+    return result;
   }
 }
 

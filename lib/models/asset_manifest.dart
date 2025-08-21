@@ -14,10 +14,10 @@ class AssetManifest {
   const AssetManifest({
     required this.gameId,
     required this.version,
-    required this.gameTitle,
-    required this.description,
-    required this.gameType,
-    required this.isEnabled,
+    this.gameTitle = '',
+    this.description = '',
+    this.gameType = 'ranking',
+    this.isEnabled = true,
     this.thumbnailAsset,
     required this.baseUrl,
     required this.assets,
@@ -29,8 +29,8 @@ class AssetManifest {
     return AssetManifest(
       gameId: json['gameId'] as String,
       version: json['version'] as String,
-      gameTitle: json['gameTitle'] as String,
-      description: json['description'] as String,
+      gameTitle: json['gameTitle'] as String? ?? '', // 개별 매니페스트에는 없을 수 있음
+      description: json['description'] as String? ?? '', // 개별 매니페스트에는 없을 수 있음
       gameType: json['gameType'] as String? ?? 'ranking',
       isEnabled: json['isEnabled'] as bool? ?? true,
       thumbnailAsset: json['thumbnailAsset'] as String?,

@@ -2,30 +2,46 @@
   "version": "1.0.0",
   "lastUpdated": "2024-08-19T12:00:00Z",
   "baseUrl": "https://pub-a9df921416264d0199fb78dad1f43e02.r2.dev",
+  "defaultUIConfig": {
+    "gridColumns": 2,
+    "aspectRatio": 0.65
+  },
   "filters": [
     {
       "gameId": "all_characters",
       "manifestUrl": "all_characters/all-characters-manifest.json",
       "category": "ranking",
-      "isEnabled": true
+      "isEnabled": true,
+      "filterTitle": "좋아하는 캐릭터",
+      "filterDescription": "다양한 캐릭터 중 좋아하는 순위를 정해보세요",
+      "filterType": "ranking"
     },
     {
       "gameId": "male_characters",
       "manifestUrl": "male_characters/male-characters-manifest.json",
       "category": "ranking",
-      "isEnabled": true
+      "isEnabled": true,
+      "filterTitle": "'케이팝 데몬 헌터스' 남자 캐릭터",
+      "filterDescription": "애니메이션 '케이팝 데몬 헌터스'의 매력적인 남성 캐릭터 중 좋아하는 순위를 정해보세요.",
+      "filterType": "ranking"
     },
     {
       "gameId": "female_characters",
       "manifestUrl": "female_characters/female-characters-manifest.json",
       "category": "ranking",
-      "isEnabled": true
+      "isEnabled": true,
+      "filterTitle": "좋아하는 '케이팝 데몬 헌터스' 여성 캐릭터",
+      "filterDescription": "매력적인 '케이팝 데몬 헌터스' 여성 캐릭터 중 좋아하는 순위를 정해보세요",
+      "filterType": "ranking"
     },
     {
       "gameId": "travel_destinations",
       "manifestUrl": "travel_destinations/travel-destinations-manifest.json",
       "category": "ranking",
-      "isEnabled": true
+      "isEnabled": true,
+      "filterTitle": "'케이팝 데몬 헌터스' 속 한국 명소",
+      "filterDescription": "애니메이션 '케이팝 데몬 헌터스'에 등장한 한국의 실제 장소들 중 가고싶은 순위를 정해보세요.",
+      "filterType": "ranking"
     }
   ]
 }
