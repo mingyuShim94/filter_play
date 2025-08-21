@@ -55,6 +55,8 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
   List<Face> _faces = [];
   List<CameraDescription> cameras = [];
   int _selectedCameraIndex = 0;
+  bool _permissionGranted = false;
+  bool _permissionRequested = false;
 
   // 이마 사각형 관련 상태 변수
   ForeheadRectangle? _currentForeheadRectangle;
@@ -79,8 +81,7 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
   @override
   void initState() {
     super.initState();
-    _requestPermissions();
-    _initializeCameras();
+    _requestPermissionsAndInitialize();
 
     // 위젯 트리 빌드 완료 후 랭킹 게임 초기화
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -149,12 +150,37 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
     super.dispose();
   }
 
-  Future<void> _requestPermissions() async {
-    final status = await Permission.camera.request();
-    if (status != PermissionStatus.granted) {
-      print("Permissions Denied");
+  Future<void> _requestPermissionsAndInitialize() async {
+    try {
+      setState(() {
+        _permissionRequested = true;
+      });
+      
+      final status = await Permission.camera.request();
+      if (status == PermissionStatus.granted) {
+        print("Camera permission granted, initializing cameras...");
+        setState(() {
+          _permissionGranted = true;
+        });
+        await _initializeCameras();
+      } else {
+        print("Camera permission denied");
+        if (mounted) {
+          setState(() {
+            _permissionGranted = false;
+          });
+        }
+      }
+    } catch (e) {
+      print("Permission request error: $e");
+      if (mounted) {
+        setState(() {
+          _permissionGranted = false;
+        });
+      }
     }
   }
+
 
   // 녹화용 권한 확인 및 요청
   Future<bool> _checkPermissions() async {
@@ -1059,7 +1085,34 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
         ],
       ),
       body: _initializeControllerFuture == null
-          ? Center(child: Text("No Camera Available"))
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    _permissionRequested
+                        ? (_permissionGranted ? Icons.camera_alt : Icons.camera_alt_outlined)
+                        : Icons.camera_alt_outlined,
+                    size: 64,
+                    color: _permissionGranted ? Colors.green : Colors.grey,
+                  ),
+                  SizedBox(height: 16),
+                  Text(
+                    _permissionRequested
+                        ? (_permissionGranted ? "카메라 초기화 중..." : "카메라 권한이 필요합니다")
+                        : "카메라 권한 요청 중...",
+                    style: TextStyle(fontSize: 16),
+                  ),
+                  if (_permissionRequested && !_permissionGranted) ...[
+                    SizedBox(height: 8),
+                    Text(
+                      "설정에서 카메라 권한을 허용해주세요",
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    ),
+                  ],
+                ],
+              ),
+            )
           : FutureBuilder<void>(
               future: _initializeControllerFuture,
               builder: (context, snapshot) {
