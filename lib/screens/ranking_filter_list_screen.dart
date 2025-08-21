@@ -147,7 +147,7 @@ class _RankingFilterListScreenState extends ConsumerState<RankingFilterListScree
                     const Text('이 필터를 사용하려면 애셋을 다운로드해야 합니다.'),
                     const SizedBox(height: 16),
                     FutureBuilder<double>(
-                      future: assetNotifier.getDownloadSize(filter.manifestPath!),
+                      future: assetNotifier.getDownloadSize(filter.id),
                       builder: (context, snapshot) {
                         if (snapshot.hasData && snapshot.data! > 0) {
                           return Text('다운로드 크기: ${assetNotifier.formatFileSize(snapshot.data!)}');

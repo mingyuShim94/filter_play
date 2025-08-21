@@ -1,12 +1,13 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:async';
+import 'dart:collection';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/services.dart' hide AssetManifest;
-import 'package:http/http.dart' as http;
+import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
 import '../models/asset_manifest.dart';
 import '../models/master_manifest.dart';
-import 'network_retry_service.dart';
 
 class DownloadProgress {
   final double progress;
@@ -41,9 +42,94 @@ class DownloadProgress {
   }
 }
 
+// 병렬 다운로드를 위한 Semaphore 클래스
+class Semaphore {
+  final int _maxCount;
+  int _currentCount;
+  final Queue<Completer<void>> _waitQueue = Queue<Completer<void>>();
+
+  Semaphore(this._maxCount) : _currentCount = _maxCount;
+
+  Future<void> acquire() async {
+    if (_currentCount > 0) {
+      _currentCount--;
+      return;
+    }
+
+    final completer = Completer<void>();
+    _waitQueue.addLast(completer);
+    return completer.future;
+  }
+
+  void release() {
+    if (_waitQueue.isNotEmpty) {
+      final completer = _waitQueue.removeFirst();
+      completer.complete();
+    } else {
+      _currentCount++;
+    }
+  }
+}
+
 class AssetDownloadService {
   static const String _manifestFileName = 'manifest.json';
-  static const Duration _timeout = Duration(seconds: 30);
+  static const int _maxConcurrentDownloads = 4;
+  
+  // Singleton Dio 인스턴스
+  static final Dio _dio = Dio(BaseOptions(
+    connectTimeout: const Duration(seconds: 5),
+    receiveTimeout: const Duration(seconds: 30),
+    sendTimeout: const Duration(seconds: 15),
+  ));
+  
+  static bool _isInitialized = false;
+  
+  static void _initializeDio() {
+    if (_isInitialized) return; // 중복 초기화 방지
+    
+    // LogInterceptor 추가 (디버깅용)
+    _dio.interceptors.add(LogInterceptor(
+      requestBody: false,
+      responseBody: false,
+      requestHeader: true,
+      responseHeader: false,
+      logPrint: (object) => print('🌐 HTTP: $object'),
+    ));
+    
+    // 재시도 인터셉터 추가
+    _dio.interceptors.add(InterceptorsWrapper(
+      onError: (error, handler) async {
+        print('❌ Dio 오류 발생: ${error.type} - ${error.message}');
+        print('   요청 URL: ${error.requestOptions.uri}');
+        
+        // 재시도 가능한 오류 타입 확인
+        if (_shouldRetry(error) && error.requestOptions.extra['retryCount'] == null) {
+          error.requestOptions.extra['retryCount'] = 1;
+          print('🔄 재시도 시도 중...');
+          
+          try {
+            await Future.delayed(const Duration(seconds: 1)); // 1초 대기
+            final response = await _dio.fetch(error.requestOptions);
+            return handler.resolve(response);
+          } catch (retryError) {
+            print('🔄 재시도 실패: $retryError');
+          }
+        }
+        
+        handler.next(error);
+      },
+    ));
+    
+    _isInitialized = true;
+    print('✅ Dio 초기화 완료 (singleton)');
+  }
+  
+  static bool _shouldRetry(DioException error) {
+    return error.type == DioExceptionType.connectionTimeout ||
+           error.type == DioExceptionType.receiveTimeout ||
+           error.type == DioExceptionType.connectionError ||
+           error.type == DioExceptionType.unknown;
+  }
 
   static Future<String> _getAssetsDirectory(String gameId) async {
     final appDocuments = await getApplicationDocumentsDirectory();
@@ -102,118 +188,103 @@ class AssetDownloadService {
     print('📋⚡ 다운로드할 파일 수: ${manifest.assets.length}개');
     print('⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐');
     
+    _initializeDio();
     final assetsDir = await _getAssetsDirectory(manifest.gameId);
-    final client = http.Client();
     
     try {
       int totalFiles = manifest.assets.length + 1; // +1 for manifest
       int downloadedFiles = 0;
-      int totalBytes = 0;
       int downloadedBytes = 0;
 
       onProgress(DownloadProgress(
         progress: 0.0,
         downloadedBytes: 0,
         totalBytes: 1,
-        currentFile: '파일 크기 계산 중...',
+        currentFile: '병렬 다운로드 시작...',
       ));
 
-      // HEAD 요청으로 파일 크기 계산
-      print('📏 파일 크기 계산 시작...');
-      for (final asset in manifest.assets) {
-        final url = manifest.getFullUrl(asset.url);
-        print('📏 크기 확인: ${asset.name} → $url');
-        
-        try {
-          final retryResult = await NetworkRetryService.retryHttpHead(
-            url,
-            timeout: _timeout,
-            config: const RetryConfig(
-              maxRetries: 1,
-              baseDelay: Duration(milliseconds: 500),
-            ),
-          );
-          
-          if (retryResult.isSuccess && retryResult.data != null) {
-            final headResponse = retryResult.data!;
-            print('   응답: ${headResponse.statusCode} (Content-Length: ${headResponse.headers['content-length'] ?? 'N/A'})');
-            
-            if (headResponse.statusCode == 200) {
-              final contentLength = headResponse.headers['content-length'];
-              if (contentLength != null) {
-                totalBytes += int.parse(contentLength);
-              }
-            }
-          } else {
-            print('   ⚠️ HEAD 요청 실패: ${retryResult.error}');
-          }
-        } catch (e) {
-          print('   ❌ HEAD 요청 오류: $e');
-          continue;
-        }
-      }
+      print('⬇️ 병렬 파일 다운로드 시작 (최대 $_maxConcurrentDownloads개 동시)...');
       
-      print('📊 전체 예상 다운로드 크기: ${formatFileSize(totalBytes.toDouble())}');
-
-      // 실제 파일 다운로드
-      print('⬇️ 파일 다운로드 시작...');
+      // 병렬 다운로드를 위한 Semaphore
+      final semaphore = Semaphore(_maxConcurrentDownloads);
+      final List<Future<Map<String, dynamic>>> downloadFutures = [];
+      
       for (final asset in manifest.assets) {
-        final url = manifest.getFullUrl(asset.url);
-        final fileName = asset.url.split('/').last;
-        final filePath = '$assetsDir/${asset.url}';
-        final file = File(filePath);
+        final future = semaphore.acquire().then((_) async {
+          try {
+            final url = manifest.getFullUrl(asset.url);
+            final fileName = asset.url.split('/').last;
+            final filePath = '$assetsDir/${asset.url}';
+            final file = File(filePath);
 
-        print('📥 다운로드 중: ${asset.name} ($fileName)');
-        print('   URL: $url');
-        print('   저장 경로: $filePath');
+            print('📥 다운로드 시작: ${asset.name} ($fileName)');
+            await file.parent.create(recursive: true);
 
-        await file.parent.create(recursive: true);
-
-        try {
-          final retryResult = await NetworkRetryService.retryHttpGet(
-            url,
-            timeout: _timeout,
-            config: const RetryConfig(
-              maxRetries: 2,
-              baseDelay: Duration(seconds: 1),
-            ),
-          );
-          
-          if (!retryResult.isSuccess || retryResult.data == null) {
-            throw Exception('파일 다운로드 실패: $url - ${retryResult.error}');
-          }
-          
-          final response = retryResult.data!;
-          print('   HTTP 응답: ${response.statusCode} ${response.reasonPhrase ?? ''}');
-          print('   응답 크기: ${response.bodyBytes.length} bytes');
-          print('   Content-Type: ${response.headers['content-type'] ?? 'N/A'}');
-          
-          if (response.statusCode == 200) {
-            await file.writeAsBytes(response.bodyBytes);
-            downloadedBytes += response.bodyBytes.length;
-            downloadedFiles++;
-            
-            print('   ✅ 파일 저장 완료: ${response.bodyBytes.length}B');
-
-            final progress = DownloadProgress(
-              progress: downloadedFiles / totalFiles,
-              downloadedBytes: downloadedBytes,
-              totalBytes: totalBytes,
-              currentFile: fileName,
+            final response = await _dio.get<List<int>>(
+              url,
+              options: Options(responseType: ResponseType.bytes),
             );
-
-            onProgress(progress);
-          } else {
-            print('   ❌ HTTP 오류: ${response.statusCode} ${response.reasonPhrase ?? ''}');
-            print('   응답 본문: ${response.body.length > 500 ? response.body.substring(0, 500) + '...' : response.body}');
-            throw Exception('파일 다운로드 실패: $url (${response.statusCode})');
+            
+            if (response.statusCode == 200 && response.data != null) {
+              await file.writeAsBytes(response.data!);
+              final size = response.data!.length;
+              
+              print('   ✅ 파일 저장 완료: ${asset.name} (${formatFileSize(size.toDouble())})');
+              
+              return {
+                'success': true,
+                'fileName': fileName,
+                'size': size,
+              };
+            } else {
+              throw Exception('HTTP ${response.statusCode}');
+            }
+          } catch (e) {
+            String errorMessage = '알 수 없는 오류';
+            if (e is DioException) {
+              errorMessage = _getDioErrorMessage(e);
+            } else {
+              errorMessage = e.toString();
+            }
+            
+            print('   ❌ 다운로드 실패: ${asset.name} - $errorMessage');
+            return {
+              'success': false,
+              'fileName': asset.url.split('/').last,
+              'error': errorMessage,
+            };
+          } finally {
+            semaphore.release();
           }
-        } catch (e) {
-          print('   ❌ 다운로드 최종 실패: $e');
-          throw Exception('$fileName 다운로드 실패: $e');
-        }
+        });
+        
+        downloadFutures.add(future);
       }
 
+      // 모든 다운로드 완료 대기하며 진행률 업데이트
+      int totalBytes = 0;
+      for (final future in downloadFutures) {
+        final result = await future;
+        downloadedFiles++;
+        
+        if (result['success'] == true) {
+          downloadedBytes += result['size'] as int;
+          totalBytes += result['size'] as int;
+        } else {
+          throw Exception('${result['fileName']} 다운로드 실패: ${result['error']}');
+        }
+
+        final progress = DownloadProgress(
+          progress: downloadedFiles / totalFiles,
+          downloadedBytes: downloadedBytes,
+          totalBytes: totalBytes > 0 ? totalBytes : downloadedBytes,
+          currentFile: result['fileName'],
+        );
+
+        onProgress(progress);
+      }
+
+      // 매니페스트 파일 저장
       final manifestFile = File('$assetsDir/$_manifestFileName');
       await manifestFile.writeAsString(json.encode(manifest.toJson()));
       downloadedFiles++;
@@ -226,10 +297,10 @@ class AssetDownloadService {
       );
 
       onProgress(finalProgress);
+      print('🎉 모든 파일 다운로드 완료: ${manifest.assets.length}개 파일, ${formatFileSize(downloadedBytes.toDouble())}');
+      
     } catch (e) {
       rethrow;
-    } finally {
-      client.close();
     }
   }
 
@@ -297,42 +368,46 @@ class AssetDownloadService {
     print('📏 다운로드 크기 계산 시작: ${manifest.gameId}');
     print('📍 Base URL: ${manifest.baseUrl}');
     
-    final client = http.Client();
+    _initializeDio();
     double totalSize = 0;
 
     try {
-      for (final asset in manifest.assets) {
+      // 병렬로 HEAD 요청 수행
+      final List<Future<int>> sizeFutures = manifest.assets.map((asset) async {
         try {
           final url = manifest.getFullUrl(asset.url);
           print('📏 크기 확인: ${asset.name} → $url');
           
-          final headResponse = await client.head(Uri.parse(url)).timeout(_timeout);
-          print('   응답: ${headResponse.statusCode} (Content-Length: ${headResponse.headers['content-length'] ?? 'N/A'})');
+          final response = await _dio.head(url);
           
-          if (headResponse.statusCode == 200) {
-            final contentLength = headResponse.headers['content-length'];
+          if (response.statusCode == 200) {
+            final contentLength = response.headers.value('content-length');
             if (contentLength != null) {
               final size = int.parse(contentLength);
-              totalSize += size;
               print('   ✅ 크기: ${formatFileSize(size.toDouble())}');
+              return size;
             } else {
               print('   ⚠️ Content-Length 헤더 없음');
+              return 0;
             }
           } else {
-            print('   ❌ HTTP 오류: ${headResponse.statusCode}');
+            print('   ❌ HTTP 오류: ${response.statusCode}');
+            return 0;
           }
         } catch (e) {
           print('   ❌ 크기 확인 실패: $e');
-          continue;
+          return 0;
         }
-      }
+      }).toList();
+      
+      // 모든 크기 정보 수집
+      final sizes = await Future.wait(sizeFutures);
+      totalSize = sizes.fold(0.0, (sum, size) => sum + size);
       
       print('📊 총 다운로드 크기: ${formatFileSize(totalSize)}');
     } catch (e) {
       print('❌ 전체 크기 계산 실패: $e');
       return -1;
-    } finally {
-      client.close();
     }
 
     return totalSize;
@@ -347,6 +422,40 @@ class AssetDownloadService {
       return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
     } else {
       return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
+    }
+  }
+
+  static String _getDioErrorMessage(DioException error) {
+    switch (error.type) {
+      case DioExceptionType.connectionTimeout:
+        return '연결 시간 초과 (5초)';
+      case DioExceptionType.sendTimeout:
+        return '요청 전송 시간 초과 (15초)';
+      case DioExceptionType.receiveTimeout:
+        return '응답 수신 시간 초과 (30초)';
+      case DioExceptionType.badResponse:
+        final statusCode = error.response?.statusCode;
+        if (statusCode != null) {
+          switch (statusCode) {
+            case 404:
+              return '파일을 찾을 수 없습니다 (404)';
+            case 403:
+              return '접근 권한이 없습니다 (403)';
+            case 500:
+              return '서버 내부 오류 (500)';
+            default:
+              return 'HTTP 오류 ($statusCode)';
+          }
+        }
+        return 'HTTP 응답 오류';
+      case DioExceptionType.cancel:
+        return '요청이 취소되었습니다';
+      case DioExceptionType.connectionError:
+        return '네트워크 연결 실패';
+      case DioExceptionType.badCertificate:
+        return 'SSL 인증서 오류';
+      case DioExceptionType.unknown:
+        return '알 수 없는 네트워크 오류: ${error.message ?? ''}';
     }
   }
 
