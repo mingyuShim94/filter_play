@@ -385,198 +385,236 @@ class _FilterCard extends ConsumerWidget {
                   ),
           ),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.start,
             children: [
-
-              // 필터 이름
-              Flexible(
-                child: Text(
-                  filter.name,
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color:
-                            filter.isEnabled ? Colors.black87 : Colors.grey[600],
-                      ),
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              const SizedBox(height: 4),
-
-              // 필터 설명
-              Flexible(
-                child: Text(
-                  filter.description,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: filter.isEnabled
-                            ? Colors.grey[700]
-                            : Colors.grey[500],
-                        fontSize: 11,
-                      ),
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-
-              // 상태 표시
-              const SizedBox(height: 6),
-              if (!filter.isEnabled) ...[
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.orange[100],
+              // 상단 50% - 이미지 영역
+              Expanded(
+                flex: 1,
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(8),
+                  child: ClipRRect(
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: Colors.orange[300]!,
+                    child: Image.asset(
+                      'assets/images/ranking/sample_thumnail.png',
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          color: Colors.grey[200],
+                          child: Icon(
+                            Icons.image_not_supported,
+                            color: Colors.grey[400],
+                            size: 40,
+                          ),
+                        );
+                      },
                     ),
-                  ),
-                  child: Text(
-                    '준비중',
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: Colors.orange[700],
-                          fontWeight: FontWeight.bold,
-                          fontSize: 10,
-                        ),
                   ),
                 ),
-              ] else if (filter.manifestPath != null) ...[
-                if (downloadStatus == DownloadStatus.downloading) ...[
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.blue[100],
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: Colors.blue[300]!,
-                      ),
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          '다운로드 중',
-                          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                color: Colors.blue[700],
-                                fontWeight: FontWeight.bold,
-                                fontSize: 10,
-                              ),
+              ),
+              
+              // 하단 50% - 텍스트 영역
+              Expanded(
+                flex: 1,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // 필터 이름과 설명
+                      Expanded(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            // 필터 이름
+                            Text(
+                              filter.name,
+                              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color: filter.isEnabled ? Colors.black87 : Colors.grey[600],
+                                  ),
+                              textAlign: TextAlign.center,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 2),
+                            
+                            // 필터 설명
+                            Text(
+                              filter.description,
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: filter.isEnabled
+                                        ? Colors.grey[700]
+                                        : Colors.grey[500],
+                                    fontSize: 10,
+                                  ),
+                              textAlign: TextAlign.center,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 2),
-                        SizedBox(
-                          height: 3,
-                          child: LinearProgressIndicator(
-                            value: downloadProgress,
-                            backgroundColor: Colors.blue[200],
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.blue[600]!),
+                      ),
+                      
+                      // 상태 표시
+                      if (!filter.isEnabled) ...[
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.orange[100],
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: Colors.orange[300]!,
+                            ),
+                          ),
+                          child: Text(
+                            '준비중',
+                            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                  color: Colors.orange[700],
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 10,
+                                ),
                           ),
                         ),
-                        const SizedBox(height: 1),
-                        Text(
-                          '${(downloadProgress * 100).toStringAsFixed(0)}%',
-                          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                color: Colors.blue[700],
-                                fontSize: 9,
+                      ] else if (filter.manifestPath != null) ...[
+                        if (downloadStatus == DownloadStatus.downloading) ...[
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.blue[100],
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: Colors.blue[300]!,
                               ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ] else if (downloadStatus == DownloadStatus.downloaded) ...[
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.green[100],
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: Colors.green[300]!,
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.check_circle,
-                          size: 12,
-                          color: Colors.green[700],
-                        ),
-                        const SizedBox(width: 2),
-                        Text(
-                          '완료',
-                          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                color: Colors.green[700],
-                                fontWeight: FontWeight.bold,
-                                fontSize: 10,
+                            ),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  '다운로드 중',
+                                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                        color: Colors.blue[700],
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 10,
+                                      ),
+                                ),
+                                const SizedBox(height: 2),
+                                SizedBox(
+                                  height: 3,
+                                  child: LinearProgressIndicator(
+                                    value: downloadProgress,
+                                    backgroundColor: Colors.blue[200],
+                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.blue[600]!),
+                                  ),
+                                ),
+                                const SizedBox(height: 1),
+                                Text(
+                                  '${(downloadProgress * 100).toStringAsFixed(0)}%',
+                                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                        color: Colors.blue[700],
+                                        fontSize: 9,
+                                      ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ] else if (downloadStatus == DownloadStatus.downloaded) ...[
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.green[100],
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: Colors.green[300]!,
                               ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ] else if (downloadStatus == DownloadStatus.failed) ...[
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.red[100],
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: Colors.red[300]!,
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.error,
-                          size: 12,
-                          color: Colors.red[700],
-                        ),
-                        const SizedBox(width: 2),
-                        Text(
-                          '실패',
-                          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                color: Colors.red[700],
-                                fontWeight: FontWeight.bold,
-                                fontSize: 10,
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.check_circle,
+                                  size: 12,
+                                  color: Colors.green[700],
+                                ),
+                                const SizedBox(width: 2),
+                                Text(
+                                  '완료',
+                                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                        color: Colors.green[700],
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 10,
+                                      ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ] else if (downloadStatus == DownloadStatus.failed) ...[
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.red[100],
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: Colors.red[300]!,
                               ),
-                        ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.error,
+                                  size: 12,
+                                  color: Colors.red[700],
+                                ),
+                                const SizedBox(width: 2),
+                                Text(
+                                  '실패',
+                                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                        color: Colors.red[700],
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 10,
+                                      ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ] else if (onDownload != null) ...[
+                          SizedBox(
+                            height: 24,
+                            child: ElevatedButton.icon(
+                              onPressed: onDownload,
+                              icon: const Icon(Icons.download, size: 12),
+                              label: const Text(
+                                '다운로드',
+                                style: TextStyle(fontSize: 10),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 2,
+                                ),
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                            ),
+                          ),
+                        ],
                       ],
-                    ),
+                    ],
                   ),
-                ] else if (onDownload != null) ...[
-                  SizedBox(
-                    height: 24,
-                    child: ElevatedButton.icon(
-                      onPressed: onDownload,
-                      icon: const Icon(Icons.download, size: 12),
-                      label: const Text(
-                        '다운로드',
-                        style: TextStyle(fontSize: 10),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 2,
-                        ),
-                        minimumSize: Size.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                    ),
-                  ),
-                ],
-              ],
+                ),
+              ),
             ],
           ),
         ),

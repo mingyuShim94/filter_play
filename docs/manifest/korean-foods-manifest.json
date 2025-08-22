@@ -1,0 +1,114 @@
+{
+  "gameId": "korean_foods_kpop_demon_hunters",
+  "version": "1.0.0",
+  "baseUrl": "https://pub-a9df921416264d0199fb78dad1f43e02.r2.dev",
+  "assets": [
+    {
+      "type": "image",
+      "key": "food_kimbap",
+      "name": "김밥",
+      "url": "korean_foods/kimbap.webp"
+    },
+    {
+      "type": "image",
+      "key": "food_cup_ramyeon",
+      "name": "컵라면",
+      "url": "korean_foods/cup_ramyeon.webp"
+    },
+    {
+      "type": "image",
+      "key": "food_seolleongtang",
+      "name": "설렁탕",
+      "url": "korean_foods/seolleongtang.webp"
+    },
+    {
+      "type": "image",
+      "key": "food_naengmyeon",
+      "name": "냉면",
+      "url": "korean_foods/naengmyeon.webp"
+    },
+    {
+      "type": "image",
+      "key": "food_buldak_sauce",
+      "name": "불닭소스",
+      "url": "korean_foods/buldak_sauce.webp"
+    },
+    {
+      "type": "image",
+      "key": "food_sundae",
+      "name": "순대",
+      "url": "korean_foods/sundae.webp"
+    },
+    {
+      "type": "image",
+      "key": "food_hotdog",
+      "name": "핫도그",
+      "url": "korean_foods/hotdog.webp"
+    },
+    {
+      "type": "image",
+      "key": "food_hotteok",
+      "name": "호떡",
+      "url": "korean_foods/hotteok.webp"
+    },
+    {
+      "type": "image",
+      "key": "food_saeukkang",
+      "name": "새우깡",
+      "url": "korean_foods/saeukkang.webp"
+    },
+    {
+      "type": "image",
+      "key": "food_pepero",
+      "name": "빼빼로",
+      "url": "korean_foods/pepero.webp"
+    }
+  ],
+  "characters": [
+    {
+      "id": "kimbap",
+      "assetKey": "food_kimbap"
+    },
+    {
+      "id": "cup_ramyeon",
+      "assetKey": "food_cup_ramyeon"
+    },
+    {
+      "id": "seolleongtang",
+      "assetKey": "food_seolleongtang"
+    },
+    {
+      "id": "naengmyeon",
+      "assetKey": "food_naengmyeon"
+    },
+    {
+      "id": "buldak_sauce",
+      "assetKey": "food_buldak_sauce"
+    },
+    {
+      "id": "sundae",
+      "assetKey": "food_sundae"
+    },
+    {
+      "id": "hotdog",
+      "assetKey": "food_hotdog"
+    },
+    {
+      "id": "hotteok",
+      "assetKey": "food_hotteok"
+    },
+    {
+      "id": "saeukkang",
+      "assetKey": "food_saeukkang"
+    },
+    {
+      "id": "pepero",
+      "assetKey": "food_pepero"
+    }
+  ],
+  "ui": {
+    "slotCount": 10,
+    "gridColumns": 2,
+    "aspectRatio": 0.65
+  }
+}

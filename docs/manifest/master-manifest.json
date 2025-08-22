@@ -42,6 +42,15 @@
       "filterTitle": "'케이팝 데몬 헌터스' 속 한국 명소",
       "filterDescription": "애니메이션 '케이팝 데몬 헌터스'에 등장한 한국의 실제 장소들 중 가고싶은 순위를 정해보세요.",
       "filterType": "ranking"
+    },
+    {
+      "gameId": "korean_foods_kpop_demon_hunters",
+      "manifestUrl": "korean_foods_kpop_demon_hunters/korean_foods_kpop_demon_hunters-manifest.json",
+      "category": "ranking",
+      "isEnabled": true,
+      "filterTitle": "'케이팝 데몬 헌터스' 속 한국 음식",
+      "filterDescription": "애니메이션 '케이팝 데몬 헌터스'에 등장한 한국의 음식들 중 먹고싶은 순위를 정해보세요.",
+      "filterType": "ranking"
     }
   ]
 }
