@@ -87,7 +87,6 @@ class RankingSlotWidget extends ConsumerWidget {
 
   // 빈 슬롯 레이아웃 - 우측 정렬하여 선택된 슬롯과 이미지 위치 맞춤
   Widget _buildEmptySlotLayout() {
-    
     return SizedBox(
       width: 97, // 36(숫자) + 7(간격) + 54(이미지)와 동일 (10% 축소)
       height: 54,
@@ -135,7 +134,7 @@ class RankingSlotWidget extends ConsumerWidget {
   // 선택된 슬롯 레이아웃 - Row로 숫자 영역과 이미지 영역 분리
   Widget _buildSelectedSlotLayout(WidgetRef ref) {
     final rankColor = _getRankColor(rank);
-    
+
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -169,9 +168,9 @@ class RankingSlotWidget extends ConsumerWidget {
             ),
           ),
         ),
-        
+
         const SizedBox(width: 7),
-        
+
         // 이미지 슬롯 영역
         AnimatedContainer(
           duration: const Duration(milliseconds: 300),
@@ -203,7 +202,6 @@ class RankingSlotWidget extends ConsumerWidget {
     );
   }
 
-
   // 선택된 슬롯 UI - 이미지만 표시 (숫자는 별도 영역에서 처리)
   Widget _buildSelectedSlot(WidgetRef ref) {
     return ClipRRect(
@@ -217,40 +215,43 @@ class RankingSlotWidget extends ConsumerWidget {
     if (item?.assetKey != null) {
       // 현재 선택된 필터의 gameId 가져오기
       final selectedFilter = ref.watch(selectedFilterProvider);
-      
+
       if (selectedFilter != null) {
-        print('🎯 [RankingSlot] 이미지 로딩 시작: gameId=${selectedFilter.id}, assetKey=${item!.assetKey}');
-        
+        print(
+            '🎯 [RankingSlot] 이미지 로딩 시작: gameId=${selectedFilter.id}, assetKey=${item!.assetKey}');
+
         // getImagePathProvider 사용하여 이마 위 이미지와 동일한 로직 적용
         final imagePathProvider = ref.read(getImagePathProvider);
-        
+
         return FutureBuilder<ImagePathResult>(
-          key: ValueKey('${selectedFilter.id}_${item!.assetKey}'), // 필터나 아이템 변경시 재빌드 보장
+          key: ValueKey(
+              '${selectedFilter.id}_${item!.assetKey}'), // 필터나 아이템 변경시 재빌드 보장
           future: imagePathProvider(selectedFilter.id, item!.assetKey!),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               print('📍 [RankingSlot] 이미지 로딩 중...');
               return _buildLoadingImage();
             }
-            
+
             if (snapshot.hasError) {
               print('❌ [RankingSlot] 이미지 로딩 에러: ${snapshot.error}');
               return _buildFallbackImage();
             }
-            
+
             if (snapshot.hasData) {
               final pathResult = snapshot.data!;
-              print('✅ [RankingSlot] 이미지 경로 결과: local=${pathResult.localPath}, remote=${pathResult.remotePath}');
-              
+              print(
+                  '✅ [RankingSlot] 이미지 경로 결과: local=${pathResult.localPath}, remote=${pathResult.remotePath}');
+
+              Widget? imageWidget;
+
               // 로컬 이미지 우선 시도
               if (pathResult.localPath != null) {
                 final file = File(pathResult.localPath!);
                 if (file.existsSync()) {
                   print('✅ [RankingSlot] 로컬 이미지 사용: ${pathResult.localPath}');
-                  return Image.file(
+                  imageWidget = Image.file(
                     file,
-                    fit: BoxFit.cover,
-                    alignment: Alignment.topCenter,
                     errorBuilder: (context, error, stackTrace) {
                       print('❌ [RankingSlot] 로컬 이미지 로딩 실패: $error');
                       return _buildFallbackImage();
@@ -258,14 +259,12 @@ class RankingSlotWidget extends ConsumerWidget {
                   );
                 }
               }
-              
+
               // 리모트 이미지 시도
-              if (pathResult.remotePath != null) {
+              if (imageWidget == null && pathResult.remotePath != null) {
                 print('🌐 [RankingSlot] 리모트 이미지 시도: ${pathResult.remotePath}');
-                return Image.network(
+                imageWidget = Image.network(
                   pathResult.remotePath!,
-                  fit: BoxFit.cover,
-                  alignment: Alignment.topCenter,
                   errorBuilder: (context, error, stackTrace) {
                     print('❌ [RankingSlot] 리모트 이미지 로딩 실패: $error');
                     return _buildFallbackImage();
@@ -276,8 +275,23 @@ class RankingSlotWidget extends ConsumerWidget {
                   },
                 );
               }
+
+              // 이미지를 세로로 절반 자르고 슬롯에 꽉 채우기
+              if (imageWidget != null) {
+                return FittedBox(
+                  fit: BoxFit.fill, // 자식 위젯을 부모 크기에 꽉 채움 (비율 무시)
+                  child: ClipRect(
+                    // 자식 위젯의 특정 영역만 보여줌
+                    child: Align(
+                      alignment: Alignment.topCenter, // 자식의 상단 중앙을 기준으로 정렬
+                      heightFactor: 0.5, // 자식 높이의 50%만 사용 (세로로 절반 자르기)
+                      child: imageWidget,
+                    ),
+                  ),
+                );
+              }
             }
-            
+
             print('⚠️ [RankingSlot] 모든 이미지 로딩 실패, fallback 사용');
             return _buildFallbackImage();
           },
@@ -288,7 +302,7 @@ class RankingSlotWidget extends ConsumerWidget {
     } else {
       print('⚠️ [RankingSlot] assetKey가 null, fallback 사용');
     }
-    
+
     // assetKey가 없거나 selectedFilter가 null이면 assets 이미지 시도
     return _buildFallbackImage();
   }
