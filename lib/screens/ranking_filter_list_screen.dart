@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../constants/theme_colors.dart';
 import '../models/filter_category.dart';
 import '../models/filter_item.dart';
 import '../providers/filter_provider.dart';
@@ -92,8 +93,20 @@ class _RankingFilterListScreenState extends ConsumerState<RankingFilterListScree
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${filter.name} 다운로드가 시작되었습니다.'),
-            backgroundColor: Colors.green,
+            content: Text(
+              '${filter.name} 다운로드가 시작되었습니다.',
+              style: const TextStyle(
+                color: ThemeColors.neoSeoulNight,
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+              ),
+            ),
+            backgroundColor: ThemeColors.neonBladeBlue,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            elevation: 4,
           ),
         );
       }
@@ -108,15 +121,55 @@ class _RankingFilterListScreenState extends ConsumerState<RankingFilterListScree
     showDialog(
       context: context,
       builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('준비중'),
-          content: Text('${filter.name} 필터는 현재 준비중입니다.\n곧 만나보실 수 있어요!'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('확인'),
+        return Theme(
+          data: Theme.of(context).copyWith(
+            dialogTheme: DialogThemeData(
+              backgroundColor: ThemeColors.deepPurple,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: BorderSide(
+                  color: ThemeColors.lightLavender.withValues(alpha: 0.3),
+                  width: 1,
+                ),
+              ),
+              elevation: 8,
+              shadowColor: ThemeColors.hunterPink.withValues(alpha: 0.3),
             ),
-          ],
+          ),
+          child: AlertDialog(
+            title: const Text(
+              '준비중',
+              style: TextStyle(
+                color: ThemeColors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+              ),
+            ),
+            content: Text(
+              '${filter.name} 필터는 현재 준비중입니다.\n곧 만나보실 수 있어요!',
+              style: const TextStyle(
+                color: ThemeColors.lightLavender,
+                fontSize: 14,
+                height: 1.5,
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                style: TextButton.styleFrom(
+                  foregroundColor: ThemeColors.neonBladeBlue,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                ),
+                child: const Text(
+                  '확인',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            ],
+          ),
         );
       },
     );
@@ -132,27 +185,85 @@ class _RankingFilterListScreenState extends ConsumerState<RankingFilterListScree
             final downloadStatus = ref.watch(downloadStatusProvider(filter.id));
             final assetNotifier = ref.read(assetProvider.notifier);
 
-            return AlertDialog(
-              title: Text('${filter.name} 다운로드'),
+            return Theme(
+              data: Theme.of(context).copyWith(
+                dialogTheme: DialogThemeData(
+                  backgroundColor: ThemeColors.deepPurple,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    side: BorderSide(
+                      color: ThemeColors.neonBladeBlue.withValues(alpha: 0.3),
+                      width: 1,
+                    ),
+                  ),
+                  elevation: 8,
+                  shadowColor: ThemeColors.neonBladeBlue.withValues(alpha: 0.3),
+                ),
+              ),
+              child: AlertDialog(
+                title: Text(
+                  '${filter.name} 다운로드',
+                  style: const TextStyle(
+                    color: ThemeColors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                  ),
+                ),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   if (downloadStatus == DownloadStatus.downloading) ...[
-                    const Text('다운로드 중...'),
+                    const Text(
+                      '다운로드 중...',
+                      style: TextStyle(
+                        color: ThemeColors.lightLavender,
+                        fontSize: 14,
+                      ),
+                    ),
                     const SizedBox(height: 16),
-                    LinearProgressIndicator(value: downloadProgress),
+                    LinearProgressIndicator(
+                      value: downloadProgress,
+                      backgroundColor: ThemeColors.deepPurple.withValues(alpha: 0.5),
+                      valueColor: const AlwaysStoppedAnimation<Color>(ThemeColors.neonBladeBlue),
+                    ),
                     const SizedBox(height: 8),
-                    Text('${(downloadProgress * 100).toStringAsFixed(1)}%'),
+                    Text(
+                      '${(downloadProgress * 100).toStringAsFixed(1)}%',
+                      style: const TextStyle(
+                        color: ThemeColors.neonBladeBlue,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ] else ...[
-                    const Text('이 필터를 사용하려면 애셋을 다운로드해야 합니다.'),
+                    const Text(
+                      '이 필터를 사용하려면 애셋을 다운로드해야 합니다.',
+                      style: TextStyle(
+                        color: ThemeColors.lightLavender,
+                        fontSize: 14,
+                        height: 1.4,
+                      ),
+                    ),
                     const SizedBox(height: 16),
                     FutureBuilder<double>(
                       future: assetNotifier.getDownloadSize(filter.id),
                       builder: (context, snapshot) {
                         if (snapshot.hasData && snapshot.data! > 0) {
-                          return Text('다운로드 크기: ${assetNotifier.formatFileSize(snapshot.data!)}');
+                          return Text(
+                            '다운로드 크기: ${assetNotifier.formatFileSize(snapshot.data!)}',
+                            style: const TextStyle(
+                              color: ThemeColors.lightLavender,
+                              fontSize: 12,
+                            ),
+                          );
                         }
-                        return const Text('크기 계산 중...');
+                        return const Text(
+                          '크기 계산 중...',
+                          style: TextStyle(
+                            color: ThemeColors.mutedText,
+                            fontSize: 12,
+                          ),
+                        );
                       },
                     ),
                   ],
@@ -165,22 +276,59 @@ class _RankingFilterListScreenState extends ConsumerState<RankingFilterListScree
                       ref.read(filterProvider.notifier).cancelDownload(filter.id);
                       Navigator.of(context).pop();
                     },
-                    child: const Text('취소'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: ThemeColors.hunterPink,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    ),
+                    child: const Text(
+                      '취소',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
                   ),
                 ] else ...[
                   TextButton(
                     onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('나중에'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: ThemeColors.lightLavender,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    ),
+                    child: const Text(
+                      '나중에',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w500,
+                        fontSize: 14,
+                      ),
+                    ),
                   ),
                   ElevatedButton(
                     onPressed: () {
                       Navigator.of(context).pop();
                       _startDownload(context, ref, filter);
                     },
-                    child: const Text('다운로드'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: ThemeColors.neonBladeBlue,
+                      foregroundColor: ThemeColors.neoSeoulNight,
+                      elevation: 4,
+                      shadowColor: ThemeColors.neonBladeBlue.withValues(alpha: 0.3),
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: const Text(
+                      '다운로드',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
                   ),
                 ],
               ],
+              ),
             );
           },
         );
@@ -192,15 +340,55 @@ class _RankingFilterListScreenState extends ConsumerState<RankingFilterListScree
     showDialog(
       context: context,
       builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('오류'),
-          content: Text(message),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('확인'),
+        return Theme(
+          data: Theme.of(context).copyWith(
+            dialogTheme: DialogThemeData(
+              backgroundColor: ThemeColors.deepPurple,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: BorderSide(
+                  color: ThemeColors.hunterPink.withValues(alpha: 0.3),
+                  width: 1,
+                ),
+              ),
+              elevation: 8,
+              shadowColor: ThemeColors.hunterPink.withValues(alpha: 0.3),
             ),
-          ],
+          ),
+          child: AlertDialog(
+            title: const Text(
+              '오류',
+              style: TextStyle(
+                color: ThemeColors.hunterPink,
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+              ),
+            ),
+            content: Text(
+              message,
+              style: const TextStyle(
+                color: ThemeColors.lightLavender,
+                fontSize: 14,
+                height: 1.4,
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                style: TextButton.styleFrom(
+                  foregroundColor: ThemeColors.hunterPink,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                ),
+                child: const Text(
+                  '확인',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            ],
+          ),
         );
       },
     );
@@ -211,9 +399,24 @@ class _RankingFilterListScreenState extends ConsumerState<RankingFilterListScree
     final filterState = ref.watch(filterProvider);
 
     return Scaffold(
+      backgroundColor: ThemeColors.neoSeoulNight,
       appBar: AppBar(
-        title: Text(_currentCategory?.name ?? '필터 선택'),
+        backgroundColor: ThemeColors.deepPurple,
+        elevation: 0,
+        title: Text(
+          _currentCategory?.name ?? '필터 선택',
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            color: ThemeColors.white,
+            fontSize: 18,
+          ),
+        ),
         automaticallyImplyLeading: false,
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: ThemeColors.appBarGradient,
+          ),
+        ),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -224,16 +427,24 @@ class _RankingFilterListScreenState extends ConsumerState<RankingFilterListScree
             // 필터 목록 제목
             Text(
               '필터 선택',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+              style: const TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+                color: ThemeColors.lightLavender,
+                letterSpacing: 0.5,
+              ),
             ),
             const SizedBox(height: 16),
 
             // 필터 목록
             Expanded(
               child: filterState.isLoading || _currentCategory == null
-                  ? const Center(child: CircularProgressIndicator())
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                        color: ThemeColors.neonBladeBlue,
+                        strokeWidth: 3,
+                      ),
+                    )
                   : (_currentCategory?.items.isEmpty ?? true)
                       ? Center(
                           child: Column(
@@ -242,17 +453,16 @@ class _RankingFilterListScreenState extends ConsumerState<RankingFilterListScree
                               Icon(
                                 Icons.inbox_outlined,
                                 size: 64,
-                                color: Colors.grey[400],
+                                color: ThemeColors.deepPurple,
                               ),
                               const SizedBox(height: 16),
                               Text(
                                 '아직 필터가 없습니다',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .bodyLarge
-                                    ?.copyWith(
-                                      color: Colors.grey[600],
-                                    ),
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  color: ThemeColors.lightLavender,
+                                  fontWeight: FontWeight.w500,
+                                ),
                               ),
                             ],
                           ),
@@ -362,27 +572,38 @@ class _FilterCard extends ConsumerWidget {
     final downloadStatus = ref.watch(downloadStatusProvider(filter.id));
     final downloadProgress = ref.watch(downloadProgressProvider(filter.id));
     return Card(
-      elevation: 2,
+      elevation: 4,
+      color: Colors.transparent,
+      shadowColor: ThemeColors.hunterPink.withValues(alpha: 0.2),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
       ),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
+        splashColor: ThemeColors.hunterPinkFaded,
+        highlightColor: ThemeColors.neonBladeBlueFaded,
         child: Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
             gradient: filter.isEnabled
-                ? null
+                ? ThemeColors.cardGradient
                 : LinearGradient(
                     colors: [
-                      Colors.grey[300]!,
-                      Colors.grey[200]!,
+                      ThemeColors.deepPurple.withValues(alpha: 0.4),
+                      ThemeColors.neoSeoulNight.withValues(alpha: 0.8),
                     ],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
+            border: Border.all(
+              color: filter.isEnabled 
+                ? ThemeColors.deepPurple.withValues(alpha: 0.3)
+                : ThemeColors.mutedText.withValues(alpha: 0.2),
+              width: 1,
+            ),
+            boxShadow: filter.isEnabled ? ThemeColors.cardShadow : null,
           ),
           child: Column(
             children: [
@@ -399,10 +620,13 @@ class _FilterCard extends ConsumerWidget {
                       fit: BoxFit.cover,
                       errorBuilder: (context, error, stackTrace) {
                         return Container(
-                          color: Colors.grey[200],
-                          child: Icon(
+                          decoration: BoxDecoration(
+                            color: ThemeColors.deepPurple.withValues(alpha: 0.3),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(
                             Icons.image_not_supported,
-                            color: Colors.grey[400],
+                            color: ThemeColors.lightLavender,
                             size: 40,
                           ),
                         );
@@ -428,10 +652,14 @@ class _FilterCard extends ConsumerWidget {
                             // 필터 이름
                             Text(
                               filter.name,
-                              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                    color: filter.isEnabled ? Colors.black87 : Colors.grey[600],
-                                  ),
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: filter.isEnabled 
+                                  ? ThemeColors.white 
+                                  : ThemeColors.mutedText,
+                                letterSpacing: 0.2,
+                              ),
                               textAlign: TextAlign.center,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -441,11 +669,11 @@ class _FilterCard extends ConsumerWidget {
                             // 필터 설명
                             Text(
                               filter.description,
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: filter.isEnabled
-                                        ? Colors.grey[700]
-                                        : Colors.grey[500],
-                                    fontSize: 10,
+                              style: TextStyle(
+                                color: filter.isEnabled
+                                    ? ThemeColors.lightLavender
+                                    : ThemeColors.mutedText.withValues(alpha: 0.7),
+                                fontSize: 10,
                                   ),
                               textAlign: TextAlign.center,
                               maxLines: 1,
@@ -459,66 +687,78 @@ class _FilterCard extends ConsumerWidget {
                       if (!filter.isEnabled) ...[
                         Container(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 3,
+                            horizontal: 8,
+                            vertical: 4,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.orange[100],
+                            color: ThemeColors.warning.withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
-                              color: Colors.orange[300]!,
+                              color: ThemeColors.warning.withValues(alpha: 0.5),
+                              width: 1,
                             ),
                           ),
                           child: Text(
                             '준비중',
-                            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                  color: Colors.orange[700],
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 10,
-                                ),
+                            style: const TextStyle(
+                              color: ThemeColors.warning,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 10,
+                              letterSpacing: 0.5,
+                            ),
                           ),
                         ),
                       ] else if (filter.manifestPath != null) ...[
                         if (downloadStatus == DownloadStatus.downloading) ...[
                           Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 3,
+                              horizontal: 8,
+                              vertical: 4,
                             ),
                             decoration: BoxDecoration(
-                              color: Colors.blue[100],
+                              color: ThemeColors.neonBladeBlue.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(8),
                               border: Border.all(
-                                color: Colors.blue[300]!,
+                                color: ThemeColors.neonBladeBlue.withValues(alpha: 0.5),
+                                width: 1,
                               ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: ThemeColors.neonBladeBlue.withValues(alpha: 0.2),
+                                  blurRadius: 4,
+                                  spreadRadius: 1,
+                                ),
+                              ],
                             ),
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Text(
                                   '다운로드 중',
-                                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                        color: Colors.blue[700],
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 10,
-                                      ),
+                                  style: const TextStyle(
+                                    color: ThemeColors.neonBladeBlue,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 10,
+                                    letterSpacing: 0.5,
+                                  ),
                                 ),
-                                const SizedBox(height: 2),
+                                const SizedBox(height: 3),
                                 SizedBox(
                                   height: 3,
                                   child: LinearProgressIndicator(
                                     value: downloadProgress,
-                                    backgroundColor: Colors.blue[200],
-                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.blue[600]!),
+                                    backgroundColor: ThemeColors.deepPurple.withValues(alpha: 0.5),
+                                    valueColor: const AlwaysStoppedAnimation<Color>(ThemeColors.neonBladeBlue),
                                   ),
                                 ),
-                                const SizedBox(height: 1),
+                                const SizedBox(height: 2),
                                 Text(
                                   '${(downloadProgress * 100).toStringAsFixed(0)}%',
-                                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                        color: Colors.blue[700],
-                                        fontSize: 9,
-                                      ),
+                                  style: TextStyle(
+                                    color: ThemeColors.neonBladeBlue.withValues(alpha: 0.8),
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                               ],
                             ),
@@ -526,15 +766,23 @@ class _FilterCard extends ConsumerWidget {
                         ] else if (downloadStatus == DownloadStatus.downloaded) ...[
                           Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 3,
+                              horizontal: 8,
+                              vertical: 4,
                             ),
                             decoration: BoxDecoration(
-                              color: Colors.green[100],
+                              color: ThemeColors.success.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(8),
                               border: Border.all(
-                                color: Colors.green[300]!,
+                                color: ThemeColors.success.withValues(alpha: 0.5),
+                                width: 1,
                               ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: ThemeColors.success.withValues(alpha: 0.2),
+                                  blurRadius: 4,
+                                  spreadRadius: 1,
+                                ),
+                              ],
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
@@ -542,16 +790,17 @@ class _FilterCard extends ConsumerWidget {
                                 Icon(
                                   Icons.check_circle,
                                   size: 12,
-                                  color: Colors.green[700],
+                                  color: ThemeColors.success,
                                 ),
-                                const SizedBox(width: 2),
+                                const SizedBox(width: 3),
                                 Text(
                                   '완료',
-                                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                        color: Colors.green[700],
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 10,
-                                      ),
+                                  style: const TextStyle(
+                                    color: ThemeColors.success,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 10,
+                                    letterSpacing: 0.5,
+                                  ),
                                 ),
                               ],
                             ),
@@ -559,15 +808,23 @@ class _FilterCard extends ConsumerWidget {
                         ] else if (downloadStatus == DownloadStatus.failed) ...[
                           Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 3,
+                              horizontal: 8,
+                              vertical: 4,
                             ),
                             decoration: BoxDecoration(
-                              color: Colors.red[100],
+                              color: ThemeColors.hunterPink.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(8),
                               border: Border.all(
-                                color: Colors.red[300]!,
+                                color: ThemeColors.hunterPink.withValues(alpha: 0.5),
+                                width: 1,
                               ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: ThemeColors.hunterPink.withValues(alpha: 0.2),
+                                  blurRadius: 4,
+                                  spreadRadius: 1,
+                                ),
+                              ],
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
@@ -575,37 +832,49 @@ class _FilterCard extends ConsumerWidget {
                                 Icon(
                                   Icons.error,
                                   size: 12,
-                                  color: Colors.red[700],
+                                  color: ThemeColors.hunterPink,
                                 ),
-                                const SizedBox(width: 2),
+                                const SizedBox(width: 3),
                                 Text(
                                   '실패',
-                                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                        color: Colors.red[700],
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 10,
-                                      ),
+                                  style: const TextStyle(
+                                    color: ThemeColors.hunterPink,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 10,
+                                    letterSpacing: 0.5,
+                                  ),
                                 ),
                               ],
                             ),
                           ),
                         ] else if (onDownload != null) ...[
                           SizedBox(
-                            height: 24,
+                            height: 28,
                             child: ElevatedButton.icon(
                               onPressed: onDownload,
-                              icon: const Icon(Icons.download, size: 12),
+                              icon: const Icon(Icons.download, size: 14),
                               label: const Text(
                                 '다운로드',
-                                style: TextStyle(fontSize: 10),
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.3,
+                                ),
                               ),
                               style: ElevatedButton.styleFrom(
+                                backgroundColor: ThemeColors.neonBladeBlue,
+                                foregroundColor: ThemeColors.neoSeoulNight,
+                                elevation: 4,
+                                shadowColor: ThemeColors.neonBladeBlue.withValues(alpha: 0.3),
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 2,
+                                  horizontal: 10,
+                                  vertical: 4,
                                 ),
                                 minimumSize: Size.zero,
                                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
                               ),
                             ),
                           ),
