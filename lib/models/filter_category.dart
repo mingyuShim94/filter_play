@@ -4,7 +4,6 @@ import 'filter_item.dart';
 class FilterCategory {
   final String id;
   final String name;
-  final String description;
   final IconData icon;
   final bool isEnabled;
   final List<FilterItem> items;
@@ -12,7 +11,6 @@ class FilterCategory {
   const FilterCategory({
     required this.id,
     required this.name,
-    required this.description,
     required this.icon,
     required this.isEnabled,
     required this.items,
@@ -21,7 +19,6 @@ class FilterCategory {
   FilterCategory copyWith({
     String? id,
     String? name,
-    String? description,
     IconData? icon,
     bool? isEnabled,
     List<FilterItem>? items,
@@ -29,7 +26,6 @@ class FilterCategory {
     return FilterCategory(
       id: id ?? this.id,
       name: name ?? this.name,
-      description: description ?? this.description,
       icon: icon ?? this.icon,
       isEnabled: isEnabled ?? this.isEnabled,
       items: items ?? this.items,
@@ -42,7 +38,6 @@ class FilterCategory {
     return other is FilterCategory &&
         other.id == id &&
         other.name == name &&
-        other.description == description &&
         other.icon == icon &&
         other.isEnabled == isEnabled;
   }
@@ -51,13 +46,12 @@ class FilterCategory {
   int get hashCode {
     return id.hashCode ^
         name.hashCode ^
-        description.hashCode ^
         icon.hashCode ^
         isEnabled.hashCode;
   }
 
   @override
   String toString() {
-    return 'FilterCategory(id: $id, name: $name, description: $description, isEnabled: $isEnabled, items: ${items.length})';
+    return 'FilterCategory(id: $id, name: $name, isEnabled: $isEnabled, items: ${items.length})';
   }
 }

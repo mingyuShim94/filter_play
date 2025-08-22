@@ -220,48 +220,6 @@ class _RankingFilterListScreenState extends ConsumerState<RankingFilterListScree
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 카테고리 설명
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16.0),
-              decoration: BoxDecoration(
-                color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: Theme.of(context).primaryColor.withValues(alpha: 0.3),
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        _currentCategory?.icon ?? Icons.filter_alt,
-                        size: 24,
-                        color: Theme.of(context).primaryColor,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        _currentCategory?.name ?? '필터 선택',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: Theme.of(context).primaryColor,
-                            ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    _currentCategory?.description ?? '다양한 필터를 체험해보세요',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Colors.grey[700],
-                        ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
 
             // 필터 목록 제목
             Text(
@@ -429,36 +387,6 @@ class _FilterCard extends ConsumerWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.start,
             children: [
-              // 필터 아이콘 또는 이미지 영역
-              Container(
-                width: 60,
-                height: 60,
-                decoration: BoxDecoration(
-                  color: filter.isEnabled
-                      ? Theme.of(context).primaryColor.withValues(alpha: 0.1)
-                      : Colors.grey[300],
-                  borderRadius: BorderRadius.circular(30),
-                  border: Border.all(
-                    color: filter.isEnabled
-                        ? Theme.of(context).primaryColor.withValues(alpha: 0.3)
-                        : Colors.grey[400]!,
-                    width: 2,
-                  ),
-                ),
-                child: filter.imageUrl != null
-                    ? ClipRRect(
-                        borderRadius: BorderRadius.circular(28),
-                        child: Image.network(
-                          filter.imageUrl!,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            return _buildDefaultIcon();
-                          },
-                        ),
-                      )
-                    : _buildDefaultIcon(),
-              ),
-              const SizedBox(height: 8),
 
               // 필터 이름
               Flexible(
@@ -656,32 +584,4 @@ class _FilterCard extends ConsumerWidget {
     );
   }
 
-  Widget _buildDefaultIcon() {
-    IconData iconData;
-
-    switch (filter.gameType) {
-      case GameType.ranking:
-        iconData = Icons.leaderboard;
-        break;
-      case GameType.faceTracking:
-        iconData = Icons.face;
-        break;
-      case GameType.voiceRecognition:
-        iconData = Icons.mic;
-        break;
-      case GameType.quiz:
-        iconData = Icons.quiz;
-        break;
-    }
-
-    return Builder(
-      builder: (context) => Icon(
-        iconData,
-        size: 28,
-        color: filter.isEnabled
-            ? Theme.of(context).primaryColor
-            : Colors.grey[500],
-      ),
-    );
-  }
 }

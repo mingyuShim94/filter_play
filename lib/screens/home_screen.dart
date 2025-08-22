@@ -297,20 +297,6 @@ class _CategoryCard extends StatelessWidget {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
-              const SizedBox(height: 4),
-
-              // 카테고리 설명
-              Text(
-                category.description,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: category.isEnabled
-                          ? Colors.grey[700]
-                          : Colors.grey[500],
-                    ),
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
 
               // 상태 표시
               const SizedBox(height: 8),

@@ -17,19 +17,19 @@ class FilterDataService {
 
   // 캐시된 마스터 매니페스트
   static MasterManifest? _cachedMasterManifest;
-  
+
   // Singleton Dio 인스턴스 (AssetDownloadService와 공유)
   static final Dio _dio = Dio(BaseOptions(
     connectTimeout: const Duration(seconds: 5),
     receiveTimeout: const Duration(seconds: 30),
     sendTimeout: const Duration(seconds: 15),
   ));
-  
+
   static bool _isInitialized = false;
-  
+
   static void _initializeDio() {
     if (_isInitialized) return; // 중복 초기화 방지
-    
+
     // LogInterceptor 추가 (디버깅용)
     _dio.interceptors.add(LogInterceptor(
       requestBody: false,
@@ -38,18 +38,19 @@ class FilterDataService {
       responseHeader: false,
       logPrint: (object) => print('🌐 Filter HTTP: $object'),
     ));
-    
+
     // 재시도 인터셉터 추가
     _dio.interceptors.add(InterceptorsWrapper(
       onError: (error, handler) async {
         print('❌ FilterDataService Dio 오류: ${error.type} - ${error.message}');
         print('   요청 URL: ${error.requestOptions.uri}');
-        
+
         // 재시도 가능한 오류 타입 확인
-        if (_shouldRetry(error) && error.requestOptions.extra['retryCount'] == null) {
+        if (_shouldRetry(error) &&
+            error.requestOptions.extra['retryCount'] == null) {
           error.requestOptions.extra['retryCount'] = 1;
           print('🔄 FilterDataService 재시도 시도 중...');
-          
+
           try {
             await Future.delayed(const Duration(seconds: 1)); // 1초 대기
             final response = await _dio.fetch(error.requestOptions);
@@ -58,20 +59,20 @@ class FilterDataService {
             print('🔄 FilterDataService 재시도 실패: $retryError');
           }
         }
-        
+
         handler.next(error);
       },
     ));
-    
+
     _isInitialized = true;
     print('✅ FilterDataService Dio 초기화 완료 (singleton)');
   }
-  
+
   static bool _shouldRetry(DioException error) {
     return error.type == DioExceptionType.connectionTimeout ||
-           error.type == DioExceptionType.receiveTimeout ||
-           error.type == DioExceptionType.connectionError ||
-           error.type == DioExceptionType.unknown;
+        error.type == DioExceptionType.receiveTimeout ||
+        error.type == DioExceptionType.connectionError ||
+        error.type == DioExceptionType.unknown;
   }
 
   static Future<List<FilterCategory>> getFilterCategories() async {
@@ -84,7 +85,6 @@ class FilterDataService {
         FilterCategory(
           id: 'ranking',
           name: '랭킹 필터',
-          description: '다양한 주제로 순위를 매기는 게임',
           icon: Icons.leaderboard,
           isEnabled: true,
           items: rankingItems,
@@ -131,7 +131,7 @@ class FilterDataService {
     // 3단계: 원격에서 다운로드
     try {
       print('🌐 원격 마스터 매니페스트 다운로드: $_masterManifestUrl');
-      
+
       _initializeDio();
 
       final response = await _dio.get(
@@ -386,7 +386,7 @@ class FilterDataService {
           } catch (parseError) {
             print('❌ JSON 파싱 실패: $parseError');
             print(
-                '📄 응답 본문 미리보기: ${response.data.toString().length > 500 ? response.data.toString().substring(0, 500) + '...' : response.data.toString()}');
+                '📄 응답 본문 미리보기: ${response.data.toString().length > 500 ? '${response.data.toString().substring(0, 500)}...' : response.data.toString()}');
             return null;
           }
         } else {
