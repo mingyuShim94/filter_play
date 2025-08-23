@@ -2,14 +2,12 @@ class MasterManifest {
   final String version;
   final String lastUpdated;
   final String baseUrl;
-  final DefaultUIConfig defaultUIConfig;
   final List<FilterManifestInfo> filters;
 
   const MasterManifest({
     required this.version,
     required this.lastUpdated,
     required this.baseUrl,
-    required this.defaultUIConfig,
     required this.filters,
   });
 
@@ -18,7 +16,6 @@ class MasterManifest {
       version: json['version'] as String,
       lastUpdated: json['lastUpdated'] as String,
       baseUrl: json['baseUrl'] as String,
-      defaultUIConfig: DefaultUIConfig.fromJson(json['defaultUIConfig'] as Map<String, dynamic>),
       filters: (json['filters'] as List<dynamic>)
           .map((filter) => FilterManifestInfo.fromJson(filter as Map<String, dynamic>))
           .toList(),
@@ -30,13 +27,16 @@ class MasterManifest {
       'version': version,
       'lastUpdated': lastUpdated,
       'baseUrl': baseUrl,
-      'defaultUIConfig': defaultUIConfig.toJson(),
       'filters': filters.map((filter) => filter.toJson()).toList(),
     };
   }
 
   String getFullManifestUrl(String manifestUrl) {
     return '$baseUrl/$manifestUrl';
+  }
+
+  String getFullThumbnailUrl(String thumbnailUrl) {
+    return '$baseUrl/$thumbnailUrl';
   }
 
   FilterManifestInfo? getFilterByGameId(String gameId) {
@@ -62,7 +62,6 @@ class MasterManifest {
         other.version == version &&
         other.lastUpdated == lastUpdated &&
         other.baseUrl == baseUrl &&
-        other.defaultUIConfig == defaultUIConfig &&
         other.filters.length == filters.length;
   }
 
@@ -71,7 +70,6 @@ class MasterManifest {
     return version.hashCode ^
         lastUpdated.hashCode ^
         baseUrl.hashCode ^
-        defaultUIConfig.hashCode ^
         filters.hashCode;
   }
 
@@ -83,6 +81,7 @@ class MasterManifest {
 
 class FilterManifestInfo {
   final String gameId;
+  final String thumbnailUrl;
   final String manifestUrl;
   final String category;
   final bool isEnabled;
@@ -92,6 +91,7 @@ class FilterManifestInfo {
 
   const FilterManifestInfo({
     required this.gameId,
+    required this.thumbnailUrl,
     required this.manifestUrl,
     required this.category,
     required this.isEnabled,
@@ -103,6 +103,7 @@ class FilterManifestInfo {
   factory FilterManifestInfo.fromJson(Map<String, dynamic> json) {
     return FilterManifestInfo(
       gameId: json['gameId'] as String,
+      thumbnailUrl: json['thumbnailUrl'] as String,
       manifestUrl: json['manifestUrl'] as String,
       category: json['category'] as String,
       isEnabled: json['isEnabled'] as bool? ?? true,
@@ -115,6 +116,7 @@ class FilterManifestInfo {
   Map<String, dynamic> toJson() {
     return {
       'gameId': gameId,
+      'thumbnailUrl': thumbnailUrl,
       'manifestUrl': manifestUrl,
       'category': category,
       'isEnabled': isEnabled,
@@ -129,6 +131,7 @@ class FilterManifestInfo {
     if (identical(this, other)) return true;
     return other is FilterManifestInfo &&
         other.gameId == gameId &&
+        other.thumbnailUrl == thumbnailUrl &&
         other.manifestUrl == manifestUrl &&
         other.category == category &&
         other.isEnabled == isEnabled &&
@@ -140,6 +143,7 @@ class FilterManifestInfo {
   @override
   int get hashCode {
     return gameId.hashCode ^
+        thumbnailUrl.hashCode ^
         manifestUrl.hashCode ^
         category.hashCode ^
         isEnabled.hashCode ^
@@ -154,44 +158,3 @@ class FilterManifestInfo {
   }
 }
 
-class DefaultUIConfig {
-  final int gridColumns;
-  final double aspectRatio;
-
-  const DefaultUIConfig({
-    required this.gridColumns,
-    required this.aspectRatio,
-  });
-
-  factory DefaultUIConfig.fromJson(Map<String, dynamic> json) {
-    return DefaultUIConfig(
-      gridColumns: json['gridColumns'] as int,
-      aspectRatio: (json['aspectRatio'] as num).toDouble(),
-    );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      'gridColumns': gridColumns,
-      'aspectRatio': aspectRatio,
-    };
-  }
-
-  @override
-  bool operator ==(Object other) {
-    if (identical(this, other)) return true;
-    return other is DefaultUIConfig &&
-        other.gridColumns == gridColumns &&
-        other.aspectRatio == aspectRatio;
-  }
-
-  @override
-  int get hashCode {
-    return gridColumns.hashCode ^ aspectRatio.hashCode;
-  }
-
-  @override
-  String toString() {
-    return 'DefaultUIConfig(gridColumns: $gridColumns, aspectRatio: $aspectRatio)';
-  }
-}

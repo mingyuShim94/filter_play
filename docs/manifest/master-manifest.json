@@ -2,13 +2,10 @@
   "version": "1.0.0",
   "lastUpdated": "2024-08-19T12:00:00Z",
   "baseUrl": "https://pub-a9df921416264d0199fb78dad1f43e02.r2.dev",
-  "defaultUIConfig": {
-    "gridColumns": 2,
-    "aspectRatio": 0.65
-  },
   "filters": [
     {
       "gameId": "all_characters",
+      "thumbnailUrl": "all_characters/thumb_all.webp",
       "manifestUrl": "all_characters/all-characters-manifest.json",
       "category": "ranking",
       "isEnabled": true,
@@ -18,6 +15,7 @@
     },
     {
       "gameId": "male_characters",
+      "thumbnailUrl": "male_characters/thumb_male.webp",
       "manifestUrl": "male_characters/male-characters-manifest.json",
       "category": "ranking",
       "isEnabled": true,
@@ -27,6 +25,7 @@
     },
     {
       "gameId": "female_characters",
+      "thumbnailUrl": "female_characters/thumb_female.webp",
       "manifestUrl": "female_characters/female-characters-manifest.json",
       "category": "ranking",
       "isEnabled": true,
@@ -36,6 +35,7 @@
     },
     {
       "gameId": "travel_destinations",
+      "thumbnailUrl": "travel_destinations/thumb_travel.webp",
       "manifestUrl": "travel_destinations/travel-destinations-manifest.json",
       "category": "ranking",
       "isEnabled": true,
@@ -45,6 +45,7 @@
     },
     {
       "gameId": "korean_foods_kpop_demon_hunters",
+      "thumbnailUrl": "korean_foods_kpop_demon_hunters/thumb.webp",
       "manifestUrl": "korean_foods_kpop_demon_hunters/korean_foods_kpop_demon_hunters-manifest.json",
       "category": "ranking",
       "isEnabled": true,

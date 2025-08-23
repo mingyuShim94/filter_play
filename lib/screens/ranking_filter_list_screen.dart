@@ -17,10 +17,12 @@ class RankingFilterListScreen extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<RankingFilterListScreen> createState() => _RankingFilterListScreenState();
+  ConsumerState<RankingFilterListScreen> createState() =>
+      _RankingFilterListScreenState();
 }
 
-class _RankingFilterListScreenState extends ConsumerState<RankingFilterListScreen> {
+class _RankingFilterListScreenState
+    extends ConsumerState<RankingFilterListScreen> {
   FilterCategory? _currentCategory;
 
   @override
@@ -62,7 +64,7 @@ class _RankingFilterListScreenState extends ConsumerState<RankingFilterListScree
     // AssetProvider에서 실시간 다운로드 상태 확인
     final downloadStatus = ref.read(downloadStatusProvider(filter.id));
     final isDownloaded = downloadStatus == DownloadStatus.downloaded;
-    
+
     // 다운로드 상태 확인
     if (!isDownloaded && filter.manifestPath != null) {
       // 다운로드가 필요한 경우 다운로드 다이얼로그 표시
@@ -81,15 +83,18 @@ class _RankingFilterListScreenState extends ConsumerState<RankingFilterListScree
     }
   }
 
-  Future<void> _startDownload(BuildContext context, WidgetRef ref, FilterItem filter) async {
+  Future<void> _startDownload(
+      BuildContext context, WidgetRef ref, FilterItem filter) async {
     if (filter.manifestPath == null) {
       _showErrorDialog(context, '다운로드 정보가 없습니다.');
       return;
     }
 
     try {
-      await ref.read(filterProvider.notifier).startDownload(filter.id, filter.manifestPath!);
-      
+      await ref
+          .read(filterProvider.notifier)
+          .startDownload(filter.id, filter.manifestPath!);
+
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -158,7 +163,8 @@ class _RankingFilterListScreenState extends ConsumerState<RankingFilterListScree
                 onPressed: () => Navigator.of(context).pop(),
                 style: TextButton.styleFrom(
                   foregroundColor: ThemeColors.neonBladeBlue,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 ),
                 child: const Text(
                   '확인',
@@ -175,13 +181,15 @@ class _RankingFilterListScreenState extends ConsumerState<RankingFilterListScree
     );
   }
 
-  void _showDownloadDialog(BuildContext context, WidgetRef ref, FilterItem filter) {
+  void _showDownloadDialog(
+      BuildContext context, WidgetRef ref, FilterItem filter) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return Consumer(
           builder: (context, ref, child) {
-            final downloadProgress = ref.watch(downloadProgressProvider(filter.id));
+            final downloadProgress =
+                ref.watch(downloadProgressProvider(filter.id));
             final downloadStatus = ref.watch(downloadStatusProvider(filter.id));
             final assetNotifier = ref.read(assetProvider.notifier);
 
@@ -209,125 +217,133 @@ class _RankingFilterListScreenState extends ConsumerState<RankingFilterListScree
                     fontSize: 18,
                   ),
                 ),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (downloadStatus == DownloadStatus.downloading) ...[
-                    const Text(
-                      '다운로드 중...',
-                      style: TextStyle(
-                        color: ThemeColors.lightLavender,
-                        fontSize: 14,
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (downloadStatus == DownloadStatus.downloading) ...[
+                      const Text(
+                        '다운로드 중...',
+                        style: TextStyle(
+                          color: ThemeColors.lightLavender,
+                          fontSize: 14,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                    LinearProgressIndicator(
-                      value: downloadProgress,
-                      backgroundColor: ThemeColors.deepPurple.withValues(alpha: 0.5),
-                      valueColor: const AlwaysStoppedAnimation<Color>(ThemeColors.neonBladeBlue),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      '${(downloadProgress * 100).toStringAsFixed(1)}%',
-                      style: const TextStyle(
-                        color: ThemeColors.neonBladeBlue,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
+                      const SizedBox(height: 16),
+                      LinearProgressIndicator(
+                        value: downloadProgress,
+                        backgroundColor:
+                            ThemeColors.deepPurple.withValues(alpha: 0.5),
+                        valueColor: const AlwaysStoppedAnimation<Color>(
+                            ThemeColors.neonBladeBlue),
                       ),
-                    ),
-                  ] else ...[
-                    const Text(
-                      '이 필터를 사용하려면 애셋을 다운로드해야 합니다.',
-                      style: TextStyle(
-                        color: ThemeColors.lightLavender,
-                        fontSize: 14,
-                        height: 1.4,
+                      const SizedBox(height: 8),
+                      Text(
+                        '${(downloadProgress * 100).toStringAsFixed(1)}%',
+                        style: const TextStyle(
+                          color: ThemeColors.neonBladeBlue,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                    FutureBuilder<double>(
-                      future: assetNotifier.getDownloadSize(filter.id),
-                      builder: (context, snapshot) {
-                        if (snapshot.hasData && snapshot.data! > 0) {
-                          return Text(
-                            '다운로드 크기: ${assetNotifier.formatFileSize(snapshot.data!)}',
-                            style: const TextStyle(
-                              color: ThemeColors.lightLavender,
+                    ] else ...[
+                      const Text(
+                        '이 필터를 사용하려면 애셋을 다운로드해야 합니다.',
+                        style: TextStyle(
+                          color: ThemeColors.lightLavender,
+                          fontSize: 14,
+                          height: 1.4,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      FutureBuilder<double>(
+                        future: assetNotifier.getDownloadSize(filter.id),
+                        builder: (context, snapshot) {
+                          if (snapshot.hasData && snapshot.data! > 0) {
+                            return Text(
+                              '다운로드 크기: ${assetNotifier.formatFileSize(snapshot.data!)}',
+                              style: const TextStyle(
+                                color: ThemeColors.lightLavender,
+                                fontSize: 12,
+                              ),
+                            );
+                          }
+                          return const Text(
+                            '크기 계산 중...',
+                            style: TextStyle(
+                              color: ThemeColors.mutedText,
                               fontSize: 12,
                             ),
                           );
-                        }
-                        return const Text(
-                          '크기 계산 중...',
-                          style: TextStyle(
-                            color: ThemeColors.mutedText,
-                            fontSize: 12,
-                          ),
-                        );
+                        },
+                      ),
+                    ],
+                  ],
+                ),
+                actions: [
+                  if (downloadStatus == DownloadStatus.downloading) ...[
+                    TextButton(
+                      onPressed: () {
+                        ref
+                            .read(filterProvider.notifier)
+                            .cancelDownload(filter.id);
+                        Navigator.of(context).pop();
                       },
+                      style: TextButton.styleFrom(
+                        foregroundColor: ThemeColors.hunterPink,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 8),
+                      ),
+                      child: const Text(
+                        '취소',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                  ] else ...[
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      style: TextButton.styleFrom(
+                        foregroundColor: ThemeColors.lightLavender,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 8),
+                      ),
+                      child: const Text(
+                        '나중에',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w500,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                    ElevatedButton(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        _startDownload(context, ref, filter);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: ThemeColors.neonBladeBlue,
+                        foregroundColor: ThemeColors.neoSeoulNight,
+                        elevation: 4,
+                        shadowColor:
+                            ThemeColors.neonBladeBlue.withValues(alpha: 0.3),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 20, vertical: 10),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: const Text(
+                        '다운로드',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
                     ),
                   ],
                 ],
-              ),
-              actions: [
-                if (downloadStatus == DownloadStatus.downloading) ...[
-                  TextButton(
-                    onPressed: () {
-                      ref.read(filterProvider.notifier).cancelDownload(filter.id);
-                      Navigator.of(context).pop();
-                    },
-                    style: TextButton.styleFrom(
-                      foregroundColor: ThemeColors.hunterPink,
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    ),
-                    child: const Text(
-                      '취소',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ),
-                ] else ...[
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    style: TextButton.styleFrom(
-                      foregroundColor: ThemeColors.lightLavender,
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    ),
-                    child: const Text(
-                      '나중에',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w500,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ),
-                  ElevatedButton(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                      _startDownload(context, ref, filter);
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: ThemeColors.neonBladeBlue,
-                      foregroundColor: ThemeColors.neoSeoulNight,
-                      elevation: 4,
-                      shadowColor: ThemeColors.neonBladeBlue.withValues(alpha: 0.3),
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    child: const Text(
-                      '다운로드',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ),
-                ],
-              ],
               ),
             );
           },
@@ -377,7 +393,8 @@ class _RankingFilterListScreenState extends ConsumerState<RankingFilterListScree
                 onPressed: () => Navigator.of(context).pop(),
                 style: TextButton.styleFrom(
                   foregroundColor: ThemeColors.hunterPink,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 ),
                 child: const Text(
                   '확인',
@@ -423,7 +440,6 @@ class _RankingFilterListScreenState extends ConsumerState<RankingFilterListScree
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-
             // 필터 목록 제목
             Text(
               '필터 선택',
@@ -467,7 +483,8 @@ class _RankingFilterListScreenState extends ConsumerState<RankingFilterListScree
                             ],
                           ),
                         )
-                      : _buildDynamicFilterGrid(ref, _currentCategory?.items ?? []),
+                      : _buildDynamicFilterGrid(
+                          ref, _currentCategory?.items ?? []),
             ),
           ],
         ),
@@ -482,29 +499,32 @@ class _RankingFilterListScreenState extends ConsumerState<RankingFilterListScree
       builder: (context, snapshot) {
         // 마스터 매니페스트가 이미 캐시되어 있어서 매우 빠르게 처리됨
         if (snapshot.connectionState == ConnectionState.waiting) {
-          // 간단한 로딩 표시 (마스터 매니페스트 캐시가 있으면 거의 즉시 완료)
-          return _buildGridWithConfig(ref, filters, {'columns': 2, 'aspectRatio': 65});
+          // 간단한 로딩 표시
+          return _buildGridWithConfig(
+              ref, filters, {'columns': 1, 'aspectRatio': 160});
         }
-        
+
         if (snapshot.hasError) {
           print('❌ 그리드 설정 계산 실패: ${snapshot.error}');
           // 에러 시 기본 설정 사용
-          return _buildGridWithConfig(ref, filters, {'columns': 2, 'aspectRatio': 65});
+          return _buildGridWithConfig(
+              ref, filters, {'columns': 1, 'aspectRatio': 160});
         }
-        
-        final gridConfig = snapshot.data ?? {'columns': 2, 'aspectRatio': 65};
+
+        final gridConfig = snapshot.data ?? {'columns': 1, 'aspectRatio': 160};
         return _buildGridWithConfig(ref, filters, gridConfig);
       },
     );
   }
 
   // 그리드 빌더 분리
-  Widget _buildGridWithConfig(WidgetRef ref, List<FilterItem> filters, Map<String, int> gridConfig) {
+  Widget _buildGridWithConfig(
+      WidgetRef ref, List<FilterItem> filters, Map<String, int> gridConfig) {
     return GridView.builder(
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: gridConfig['columns']!,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
+        crossAxisSpacing: 8, // 가로형 카드에 최적화된 간격
+        mainAxisSpacing: 6, // 세로 간격 단축으로 더 많은 카드 표시
         childAspectRatio: gridConfig['aspectRatio']! / 100.0,
       ),
       itemCount: filters.length,
@@ -521,38 +541,19 @@ class _RankingFilterListScreenState extends ConsumerState<RankingFilterListScree
     );
   }
 
-  // 마스터 매니페스트에서 그리드 설정 계산 (네트워크 요청 없음)
-  Future<Map<String, int>> _calculateGridConfig(List<FilterItem> filters) async {
-    print('📊 그리드 설정 계산 시작: 마스터 매니페스트 defaultUIConfig 사용');
+  // 로컬 그리드 설정 (960x600 이미지에 최적화된 1열 레이아웃)
+  Future<Map<String, int>> _calculateGridConfig(
+      List<FilterItem> filters) async {
+    print('📊 로컬 그리드 설정 사용: 960x600 이미지 최적화된 1열 레이아웃');
 
-    try {
-      // 마스터 매니페스트에서 기본 UI 설정 가져오기
-      final masterManifest = await FilterDataService.getMasterManifest();
-      
-      if (masterManifest?.defaultUIConfig != null) {
-        final config = masterManifest!.defaultUIConfig;
-        final result = {
-          'columns': config.gridColumns,
-          'aspectRatio': (config.aspectRatio * 100).round(),
-        };
-        
-        print('✅ 마스터 매니페스트 UI 설정 적용: $result');
-        return result;
-      } else {
-        print('⚠️ 마스터 매니페스트에 defaultUIConfig 없음, 기본값 사용');
-      }
-    } catch (e) {
-      print('❌ 마스터 매니페스트 로드 실패, 기본값 사용: $e');
-    }
-
-    // 기본값
-    final result = {
-      'columns': 2,
-      'aspectRatio': 65, // 0.65 * 100
+    // 로컬 UI 설정 (960x600 이미지를 위한 1열 레이아웃)
+    const localUIConfig = {
+      'columns': 1,        // 1열로 설정하여 가로 이미지를 화면 폭에 맞게 표시
+      'aspectRatio': 160,  // 1.6 * 100 (960x600 비율)
     };
 
-    print('📊 기본 그리드 설정 사용: $result');
-    return result;
+    print('✅ 로컬 UI 설정 적용: $localUIConfig');
+    return localUIConfig;
   }
 }
 
@@ -567,328 +568,348 @@ class _FilterCard extends ConsumerWidget {
     this.onDownload,
   });
 
+  // 필터 ID로 썸네일 URL 가져오기
+  Future<String?> _getThumbnailUrl(String filterId) async {
+    try {
+      final masterManifest = await FilterDataService.getMasterManifest();
+      final filterInfo = masterManifest?.filters.firstWhere(
+        (f) => f.gameId == filterId,
+        orElse: () => throw Exception('Filter not found'),
+      );
+      
+      if (filterInfo != null && masterManifest != null) {
+        return masterManifest.getFullThumbnailUrl(filterInfo.thumbnailUrl);
+      }
+    } catch (e) {
+      print('썸네일 URL 로드 실패: $e');
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final downloadStatus = ref.watch(downloadStatusProvider(filter.id));
     final downloadProgress = ref.watch(downloadProgressProvider(filter.id));
+
+    // --- '케이팝 데몬 헌터스' 테마 색상 및 스타일 ---
+    const cardBackgroundColor = Color(0xFF3D2559);
+    const primaryTextColor = Colors.white;
+    const secondaryTextColor = Color(0xFFA095B3);
+    const hunterPinkShadow = Color(0xFFE800FF);
+    // ---
+
     return Card(
+      color: cardBackgroundColor,
       elevation: 4,
-      color: Colors.transparent,
-      shadowColor: ThemeColors.hunterPink.withValues(alpha: 0.2),
+      shadowColor: hunterPinkShadow.withValues(alpha: 0.2),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
       ),
+      // Card의 경계에 맞춰 자식 위젯(이미지 등)을 잘라냅니다.
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        splashColor: ThemeColors.hunterPinkFaded,
-        highlightColor: ThemeColors.neonBladeBlueFaded,
-        child: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            gradient: filter.isEnabled
-                ? ThemeColors.cardGradient
-                : LinearGradient(
-                    colors: [
-                      ThemeColors.deepPurple.withValues(alpha: 0.4),
-                      ThemeColors.neoSeoulNight.withValues(alpha: 0.8),
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-            border: Border.all(
-              color: filter.isEnabled 
-                ? ThemeColors.deepPurple.withValues(alpha: 0.3)
-                : ThemeColors.mutedText.withValues(alpha: 0.2),
-              width: 1,
-            ),
-            boxShadow: filter.isEnabled ? ThemeColors.cardShadow : null,
-          ),
-          child: Column(
-            children: [
-              // 상단 50% - 이미지 영역
-              Expanded(
-                flex: 1,
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(8),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Image.asset(
-                      'assets/images/ranking/sample_thumnail.png',
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
-                          decoration: BoxDecoration(
-                            color: ThemeColors.deepPurple.withValues(alpha: 0.3),
-                            borderRadius: BorderRadius.circular(8),
+        splashColor: hunterPinkShadow.withValues(alpha: 0.1),
+        highlightColor: hunterPinkShadow.withValues(alpha: 0.1),
+        child: Stack(
+          fit: StackFit.expand, // Stack의 자식들이 전체를 채우도록 함
+          children: [
+            // 1. 배경 썸네일 이미지 (동적 로딩)
+            FutureBuilder<String?>(
+              future: _getThumbnailUrl(filter.id),
+              builder: (context, snapshot) {
+                if (snapshot.hasData && snapshot.data != null) {
+                  return Image.network(
+                    snapshot.data!,
+                    fit: BoxFit.cover,
+                    // 비활성화 시 필터 효과 적용
+                    color: !filter.isEnabled
+                        ? Colors.black.withValues(alpha: 0.5)
+                        : null,
+                    colorBlendMode: BlendMode.darken,
+                    // 네트워크 이미지 로딩 중 표시
+                    loadingBuilder: (context, child, loadingProgress) {
+                      if (loadingProgress == null) return child;
+                      return Container(
+                        color: Colors.black.withValues(alpha: 0.3),
+                        child: Center(
+                          child: CircularProgressIndicator(
+                            value: loadingProgress.expectedTotalBytes != null
+                                ? loadingProgress.cumulativeBytesLoaded / 
+                                  loadingProgress.expectedTotalBytes!
+                                : null,
+                            color: ThemeColors.neonBladeBlue,
+                            strokeWidth: 2,
                           ),
-                          child: const Icon(
-                            Icons.image_not_supported,
-                            color: ThemeColors.lightLavender,
-                            size: 40,
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ),
-              ),
-              
-              // 하단 50% - 텍스트 영역
-              Expanded(
-                flex: 1,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      // 필터 이름과 설명
-                      Expanded(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            // 필터 이름
-                            Text(
-                              filter.name,
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                                color: filter.isEnabled 
-                                  ? ThemeColors.white 
-                                  : ThemeColors.mutedText,
-                                letterSpacing: 0.2,
-                              ),
-                              textAlign: TextAlign.center,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 2),
-                            
-                            // 필터 설명
-                            Text(
-                              filter.description,
-                              style: TextStyle(
-                                color: filter.isEnabled
-                                    ? ThemeColors.lightLavender
-                                    : ThemeColors.mutedText.withValues(alpha: 0.7),
-                                fontSize: 10,
-                                  ),
-                              textAlign: TextAlign.center,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
                         ),
+                      );
+                    },
+                    // 이미지 로딩 실패 시 처리
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        color: Colors.black.withValues(alpha: 0.3),
+                        child: const Icon(
+                          Icons.image_not_supported,
+                          color: secondaryTextColor,
+                          size: 40,
+                        ),
+                      );
+                    },
+                  );
+                }
+                
+                // 썸네일 URL을 가져오는 중이거나 실패한 경우 기본 이미지
+                return Image.asset(
+                  'assets/images/ranking/sample_thumnail.png',
+                  fit: BoxFit.cover,
+                  color: !filter.isEnabled
+                      ? Colors.black.withValues(alpha: 0.5)
+                      : null,
+                  colorBlendMode: BlendMode.darken,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      color: Colors.black.withValues(alpha: 0.3),
+                      child: const Icon(
+                        Icons.image_not_supported,
+                        color: secondaryTextColor,
+                        size: 40,
                       ),
-                      
-                      // 상태 표시
-                      if (!filter.isEnabled) ...[
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: ThemeColors.warning.withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: ThemeColors.warning.withValues(alpha: 0.5),
-                              width: 1,
-                            ),
-                          ),
-                          child: Text(
-                            '준비중',
-                            style: const TextStyle(
-                              color: ThemeColors.warning,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 10,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                        ),
-                      ] else if (filter.manifestPath != null) ...[
-                        if (downloadStatus == DownloadStatus.downloading) ...[
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: ThemeColors.neonBladeBlue.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: ThemeColors.neonBladeBlue.withValues(alpha: 0.5),
-                                width: 1,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: ThemeColors.neonBladeBlue.withValues(alpha: 0.2),
-                                  blurRadius: 4,
-                                  spreadRadius: 1,
-                                ),
-                              ],
-                            ),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  '다운로드 중',
-                                  style: const TextStyle(
-                                    color: ThemeColors.neonBladeBlue,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 10,
-                                    letterSpacing: 0.5,
-                                  ),
-                                ),
-                                const SizedBox(height: 3),
-                                SizedBox(
-                                  height: 3,
-                                  child: LinearProgressIndicator(
-                                    value: downloadProgress,
-                                    backgroundColor: ThemeColors.deepPurple.withValues(alpha: 0.5),
-                                    valueColor: const AlwaysStoppedAnimation<Color>(ThemeColors.neonBladeBlue),
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  '${(downloadProgress * 100).toStringAsFixed(0)}%',
-                                  style: TextStyle(
-                                    color: ThemeColors.neonBladeBlue.withValues(alpha: 0.8),
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ] else if (downloadStatus == DownloadStatus.downloaded) ...[
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: ThemeColors.success.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: ThemeColors.success.withValues(alpha: 0.5),
-                                width: 1,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: ThemeColors.success.withValues(alpha: 0.2),
-                                  blurRadius: 4,
-                                  spreadRadius: 1,
-                                ),
-                              ],
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.check_circle,
-                                  size: 12,
-                                  color: ThemeColors.success,
-                                ),
-                                const SizedBox(width: 3),
-                                Text(
-                                  '완료',
-                                  style: const TextStyle(
-                                    color: ThemeColors.success,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 10,
-                                    letterSpacing: 0.5,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ] else if (downloadStatus == DownloadStatus.failed) ...[
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: ThemeColors.hunterPink.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: ThemeColors.hunterPink.withValues(alpha: 0.5),
-                                width: 1,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: ThemeColors.hunterPink.withValues(alpha: 0.2),
-                                  blurRadius: 4,
-                                  spreadRadius: 1,
-                                ),
-                              ],
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.error,
-                                  size: 12,
-                                  color: ThemeColors.hunterPink,
-                                ),
-                                const SizedBox(width: 3),
-                                Text(
-                                  '실패',
-                                  style: const TextStyle(
-                                    color: ThemeColors.hunterPink,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 10,
-                                    letterSpacing: 0.5,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ] else if (onDownload != null) ...[
-                          SizedBox(
-                            height: 28,
-                            child: ElevatedButton.icon(
-                              onPressed: onDownload,
-                              icon: const Icon(Icons.download, size: 14),
-                              label: const Text(
-                                '다운로드',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: 0.3,
-                                ),
-                              ),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: ThemeColors.neonBladeBlue,
-                                foregroundColor: ThemeColors.neoSeoulNight,
-                                elevation: 4,
-                                shadowColor: ThemeColors.neonBladeBlue.withValues(alpha: 0.3),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 4,
-                                ),
-                                minimumSize: Size.zero,
-                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ],
+                    );
+                  },
+                );
+              },
+            ),
+
+            // 2. 텍스트 가독성을 위한 하단 그라데이션 오버레이
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: Container(
+                height: 70, // 가로형 이미지에 맞게 조정된 텍스트 영역 높이
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      Colors.transparent,
+                      Colors.black.withValues(alpha: 0.7), // 가로형 이미지에서 더 강한 가독성
+                      Colors.black.withValues(alpha: 0.95), // 텍스트 가독성 극대화
                     ],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
                   ),
                 ),
               ),
-            ],
-          ),
+            ),
+
+            // 3. 필터 텍스트 정보 (이름, 설명)
+            Positioned(
+              bottom: 10, // 가로형 카드에 맞게 패딩 조정
+              left: 12,
+              right: 12,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    filter.name,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontFamily: 'Poppins',
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15, // 가로형 카드에서 더 큰 제목
+                      color: primaryTextColor,
+                      // 가로형 이미지에서 텍스트 가독성 극대화를 위한 다중 그림자
+                      shadows: [
+                        const Shadow(
+                          blurRadius: 6,
+                          offset: Offset(0, 1),
+                          color: Colors.black87,
+                        ),
+                        const Shadow(
+                          blurRadius: 2,
+                          offset: Offset(0, 0),
+                          color: Colors.black54,
+                        ),
+                      ],
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 1), // 더 컴팩트한 간격
+                  Text(
+                    filter.description,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: secondaryTextColor,
+                          fontSize: 11,
+                        ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+
+            // 4. 상태 표시 위젯 (다운로드, 준비중 등) - 오른쪽 상단에 배치
+            Positioned(
+              top: 6, // 가로형 카드에 맞게 위치 조정
+              right: 8,
+              child: _buildStatusBadge(
+                context,
+                filter,
+                downloadStatus,
+                downloadProgress,
+                onDownload,
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
+  /// 필터의 상태에 따라 적절한 뱃지(Badge) 위젯을 생성하여 반환합니다.
+  /// 코드를 깔끔하게 유지하기 위해 별도 함수로 분리했습니다.
+  Widget _buildStatusBadge(
+    BuildContext context,
+    FilterItem filter,
+    DownloadStatus status,
+    double progress,
+    VoidCallback? onDownload,
+  ) {
+    // 준비중
+    if (!filter.isEnabled) {
+      return _StatusContainer(
+        backgroundColor: Colors.orange.shade900.withValues(alpha: 0.8),
+        child: const Text('준비중',
+            style: TextStyle(
+                color: Colors.white,
+                fontSize: 10,
+                fontWeight: FontWeight.bold)),
+      );
+    }
+
+    if (filter.manifestPath != null) {
+      // 다운로드 중
+      if (status == DownloadStatus.downloading) {
+        return _StatusContainer(
+          backgroundColor: Colors.black.withValues(alpha: 0.6),
+          child: Column(
+            children: [
+              Text('${(progress * 100).toStringAsFixed(0)}%',
+                  style: const TextStyle(
+                      color: Color(0xFF00E0FF),
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold)),
+              const SizedBox(height: 2),
+              SizedBox(
+                width: 40,
+                height: 3,
+                child: LinearProgressIndicator(
+                  value: progress,
+                  backgroundColor: Colors.grey.shade700,
+                  valueColor:
+                      const AlwaysStoppedAnimation<Color>(Color(0xFF00E0FF)),
+                ),
+              ),
+            ],
+          ),
+        );
+      }
+      // 다운로드 완료
+      if (status == DownloadStatus.downloaded) {
+        return _StatusContainer(
+          backgroundColor:
+              const Color(0xFF00E0FF).withValues(alpha: 0.8), // Neon Blade Blue
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.check, size: 12, color: Colors.black),
+              SizedBox(width: 4),
+              Text('보유중',
+                  style: TextStyle(
+                      color: Colors.black,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold)),
+            ],
+          ),
+        );
+      }
+      // 다운로드 실패
+      if (status == DownloadStatus.failed) {
+        return _StatusContainer(
+          backgroundColor:
+              const Color(0xFFE800FF).withValues(alpha: 0.8), // Hunter Pink
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.error_outline, size: 12, color: Colors.white),
+              SizedBox(width: 4),
+              Text('실패',
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold)),
+            ],
+          ),
+        );
+      }
+      // 다운로드 필요
+      if (onDownload != null) {
+        return Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onDownload,
+            borderRadius: BorderRadius.circular(8),
+            child: _StatusContainer(
+              backgroundColor: Colors.black.withValues(alpha: 0.6),
+              borderColor: const Color(0xFF00E0FF),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.download, size: 12, color: Color(0xFF00E0FF)),
+                  SizedBox(width: 4),
+                  Text('받기',
+                      style: TextStyle(
+                          color: Color(0xFF00E0FF),
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold)),
+                ],
+              ),
+            ),
+          ),
+        );
+      }
+    }
+
+    // 아무 상태도 해당하지 않으면 빈 위젯 반환
+    return const SizedBox.shrink();
+  }
+}
+
+/// 상태 뱃지의 공통적인 디자인을 위한 작은 컨테이너 위젯
+class _StatusContainer extends StatelessWidget {
+  final Widget child;
+  final Color backgroundColor;
+  final Color? borderColor;
+
+  const _StatusContainer({
+    required this.child,
+    required this.backgroundColor,
+    this.borderColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+          horizontal: 6, vertical: 3), // 가로형 카드에 맞게 더 컴팩트하게
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(8),
+        border: borderColor != null
+            ? Border.all(color: borderColor!, width: 1)
+            : null,
+      ),
+      child: child,
+    );
+  }
 }
