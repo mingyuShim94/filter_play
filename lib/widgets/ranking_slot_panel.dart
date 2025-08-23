@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/ranking_item.dart';
@@ -276,19 +277,9 @@ class RankingSlotWidget extends ConsumerWidget {
                 );
               }
 
-              // 이미지를 세로로 절반 자르고 슬롯에 꽉 채우기
+              // 이미지 비율에 따른 조건부 크롭핑
               if (imageWidget != null) {
-                return FittedBox(
-                  fit: BoxFit.fill, // 자식 위젯을 부모 크기에 꽉 채움 (비율 무시)
-                  child: ClipRect(
-                    // 자식 위젯의 특정 영역만 보여줌
-                    child: Align(
-                      alignment: Alignment.topCenter, // 자식의 상단 중앙을 기준으로 정렬
-                      heightFactor: 0.5, // 자식 높이의 50%만 사용 (세로로 절반 자르기)
-                      child: imageWidget,
-                    ),
-                  ),
-                );
+                return _buildConditionalCroppedImage(imageWidget, pathResult);
               }
             }
 
@@ -350,6 +341,86 @@ class RankingSlotWidget extends ConsumerWidget {
         color: Colors.white60,
       ),
     );
+  }
+
+  // 이미지 비율에 따른 조건부 크롭핑
+  Widget _buildConditionalCroppedImage(Widget imageWidget, ImagePathResult pathResult) {
+    // 이미지 파일이 있을 때만 크기 확인 수행
+    if (pathResult.localPath != null) {
+      final file = File(pathResult.localPath!);
+      if (file.existsSync()) {
+        return FutureBuilder<ui.Image>(
+          future: _getImageInfo(file),
+          builder: (context, snapshot) {
+            if (snapshot.hasData && snapshot.data != null) {
+              final image = snapshot.data!;
+              final isPortrait = image.height > image.width;
+              
+              if (isPortrait) {
+                // 세로가 긴 이미지: 절반 자르기 적용
+                return FittedBox(
+                  fit: BoxFit.fill,
+                  child: ClipRect(
+                    child: Align(
+                      alignment: Alignment.topCenter,
+                      heightFactor: 0.5, // 세로로 절반 자르기
+                      child: imageWidget,
+                    ),
+                  ),
+                );
+              } else {
+                // 가로가 긴 이미지나 정사각형: 자연스럽게 크롭
+                return ClipRRect(
+                  borderRadius: BorderRadius.circular(13),
+                  child: SizedBox(
+                    width: 54,
+                    height: 54,
+                    child: FittedBox(
+                      fit: BoxFit.cover,
+                      child: imageWidget,
+                    ),
+                  ),
+                );
+              }
+            }
+            
+            // 이미지 정보 로딩 중이거나 실패한 경우: 기본 BoxFit.cover 적용
+            return ClipRRect(
+              borderRadius: BorderRadius.circular(13),
+              child: SizedBox(
+                width: 54,
+                height: 54,
+                child: FittedBox(
+                  fit: BoxFit.cover,
+                  child: imageWidget,
+                ),
+              ),
+            );
+          },
+        );
+      }
+    }
+    
+    // 로컬 파일이 없는 경우 (리모트 이미지): 기본 BoxFit.cover 적용
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(13),
+      child: SizedBox(
+        width: 54,
+        height: 54,
+        child: FittedBox(
+          fit: BoxFit.cover,
+          child: imageWidget,
+        ),
+      ),
+    );
+  }
+
+  // 이미지 파일에서 크기 정보를 획득하는 헬퍼 메서드
+  Future<ui.Image> _getImageInfo(File imageFile) async {
+    final bytes = await imageFile.readAsBytes();
+    final codec = await ui.instantiateImageCodec(bytes);
+    final frame = await codec.getNextFrame();
+    return frame.image;
   }
 
   Color _getRankColor(int rank) {
