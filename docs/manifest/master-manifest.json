@@ -44,9 +44,9 @@
       "filterType": "ranking"
     },
     {
-      "gameId": "korean_foods_kpop_demon_hunters",
-      "thumbnailUrl": "korean_foods_kpop_demon_hunters/thumb.webp",
-      "manifestUrl": "korean_foods_kpop_demon_hunters/korean_foods_kpop_demon_hunters-manifest.json",
+      "gameId": "korean_foods",
+      "thumbnailUrl": "korean_foods/thumb_food.webp",
+      "manifestUrl": "korean_foods/korean-foods-manifest.json",
       "category": "ranking",
       "isEnabled": true,
       "filterTitle": "'케이팝 데몬 헌터스' 속 한국 음식",
