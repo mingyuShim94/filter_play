@@ -60,6 +60,7 @@ class FilterNotifier extends StateNotifier<FilterState> {
   FilterNotifier(this._ref) : super(const FilterState()) {
     _loadCategories();
     _setupDownloadCompleteCallback();
+    _setupMasterManifestUpdateCallback();
   }
 
   final Ref _ref;
@@ -69,6 +70,14 @@ class FilterNotifier extends StateNotifier<FilterState> {
     final assetNotifier = _ref.read(assetProvider.notifier);
     assetNotifier.setDownloadCompleteCallback((filterId) async {
       // 다운로드 완료 시 FilterProvider 상태 새로고침
+      await refreshCategories();
+    });
+  }
+
+  void _setupMasterManifestUpdateCallback() {
+    // FilterDataService의 마스터 매니페스트 업데이트 콜백 설정
+    FilterDataService.setUpdateCallback(() async {
+      // 마스터 매니페스트 업데이트 시 FilterProvider 상태 새로고침
       await refreshCategories();
     });
   }

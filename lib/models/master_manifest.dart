@@ -86,7 +86,6 @@ class FilterManifestInfo {
   final String category;
   final bool isEnabled;
   final String filterTitle;
-  final String filterDescription;
   final String filterType;
 
   const FilterManifestInfo({
@@ -96,7 +95,6 @@ class FilterManifestInfo {
     required this.category,
     required this.isEnabled,
     required this.filterTitle,
-    required this.filterDescription,
     required this.filterType,
   });
 
@@ -108,7 +106,6 @@ class FilterManifestInfo {
       category: json['category'] as String,
       isEnabled: json['isEnabled'] as bool? ?? true,
       filterTitle: json['filterTitle'] as String,
-      filterDescription: json['filterDescription'] as String,
       filterType: json['filterType'] as String,
     );
   }
@@ -121,7 +118,6 @@ class FilterManifestInfo {
       'category': category,
       'isEnabled': isEnabled,
       'filterTitle': filterTitle,
-      'filterDescription': filterDescription,
       'filterType': filterType,
     };
   }
@@ -136,7 +132,6 @@ class FilterManifestInfo {
         other.category == category &&
         other.isEnabled == isEnabled &&
         other.filterTitle == filterTitle &&
-        other.filterDescription == filterDescription &&
         other.filterType == filterType;
   }
 
@@ -148,7 +143,6 @@ class FilterManifestInfo {
         category.hashCode ^
         isEnabled.hashCode ^
         filterTitle.hashCode ^
-        filterDescription.hashCode ^
         filterType.hashCode;
   }
 

@@ -734,16 +734,6 @@ class _FilterCard extends ConsumerWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 1), // 더 컴팩트한 간격
-                  Text(
-                    filter.description,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: secondaryTextColor,
-                          fontSize: 11,
-                        ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
                 ],
               ),
             ),

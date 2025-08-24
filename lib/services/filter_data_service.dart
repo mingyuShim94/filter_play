@@ -18,6 +18,9 @@ class FilterDataService {
   // 캐시된 마스터 매니페스트
   static MasterManifest? _cachedMasterManifest;
 
+  // 업데이트 콜백
+  static VoidCallback? _updateCallback;
+
   // Singleton Dio 인스턴스 (AssetDownloadService와 공유)
   static final Dio _dio = Dio(BaseOptions(
     connectTimeout: const Duration(seconds: 5),
@@ -211,6 +214,12 @@ class FilterDataService {
             // 로컬 파일 업데이트
             await AssetDownloadService.saveMasterManifest(remoteManifest);
             print('✅ 마스터 매니페스트 백그라운드 업데이트 완료');
+
+            // 업데이트 콜백 호출 (UI 새로고침)
+            if (_updateCallback != null) {
+              _updateCallback!();
+              print('📢 FilterProvider에 업데이트 알림 전송');
+            }
           } else {
             print('✅ 마스터 매니페스트가 최신 버전입니다');
           }
@@ -255,7 +264,6 @@ class FilterDataService {
       final filterItem = FilterItem(
         id: filterInfo.gameId,
         name: filterInfo.filterTitle,
-        description: filterInfo.filterDescription,
         gameType: _parseGameType(filterInfo.filterType),
         isEnabled: filterInfo.isEnabled,
         manifestPath: filterInfo.manifestUrl,
@@ -423,5 +431,10 @@ class FilterDataService {
   /// 마스터 매니페스트 접근용 public 메서드
   static Future<MasterManifest?> getMasterManifest() async {
     return await _loadMasterManifest();
+  }
+
+  /// 업데이트 콜백 설정
+  static void setUpdateCallback(VoidCallback? callback) {
+    _updateCallback = callback;
   }
 }
