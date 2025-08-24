@@ -1,6 +1,6 @@
 {
   "gameId": "male_characters",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "baseUrl": "https://pub-a9df921416264d0199fb78dad1f43e02.r2.dev",
   "assets": [
     {
@@ -79,7 +79,7 @@
     },
     {
       "id": "abs",
-      "assetKey": "male_character_abs"
+      "assetKey": "male_character_abby"
     },
     {
       "id": "baby",
