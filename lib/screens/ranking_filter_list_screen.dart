@@ -761,7 +761,7 @@ class _FilterCard extends ConsumerWidget {
                         ),
                       ],
                     ),
-                    maxLines: 1,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ],

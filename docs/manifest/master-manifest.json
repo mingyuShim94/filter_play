@@ -1,5 +1,5 @@
 {
-  "version": "1.0.2",
+  "version": "1.0.6",
   "lastUpdated": "2024-08-19T12:00:00Z",
   "baseUrl": "https://pub-a9df921416264d0199fb78dad1f43e02.r2.dev",
   "filters": [
@@ -9,7 +9,7 @@
       "manifestUrl": "all_characters/all-characters-manifest.json",
       "category": "ranking",
       "isEnabled": true,
-      "filterTitle": "나의 원픽! 최애캐 TOP 10",
+      "filterTitle": "My #1 Pick!\nTop 10 Favorite Characters",
       "filterType": "ranking"
     },
     {
@@ -18,7 +18,7 @@
       "manifestUrl": "male_characters/male-characters-manifest.json",
       "category": "ranking",
       "isEnabled": true,
-      "filterTitle": "심장을 뛰게 한 남캐 TOP 10",
+      "filterTitle": "Top 10 Heart-Throb Male Characters",
       "filterType": "ranking"
     },
     {
@@ -27,7 +27,7 @@
       "manifestUrl": "female_characters/female-characters-manifest.json",
       "category": "ranking",
       "isEnabled": true,
-      "filterTitle": "걸크러쉬! 최애 여캐 TOP 10",
+      "filterTitle": "Girl Crush!\nTop 10 Favorite Female Characters",
       "filterType": "ranking"
     },
     {
@@ -36,7 +36,7 @@
       "manifestUrl": "travel_destinations/travel-destinations-manifest.json",
       "category": "ranking",
       "isEnabled": true,
-      "filterTitle": "헌트릭스 발자취 따라가기 TOP 10",
+      "filterTitle": "Follow in Huntrix's Footsteps:\nTop 10 Locations",
       "filterType": "ranking"
     },
     {
@@ -45,7 +45,7 @@
       "manifestUrl": "korean_foods/korean-foods-manifest.json",
       "category": "ranking",
       "isEnabled": true,
-      "filterTitle": "헌트릭스 최애 K-푸드 TOP 10",
+      "filterTitle": "Huntrix's Favorite K-Foods: Top 10 Picks",
       "filterType": "ranking"
     }
   ]
