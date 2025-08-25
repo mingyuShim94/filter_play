@@ -7,6 +7,7 @@ import '../models/asset_manifest.dart';
 import '../models/master_manifest.dart';
 import 'manifest_cache_service.dart';
 import 'asset_download_service.dart';
+import 'asset_cache_service.dart';
 
 class FilterDataService {
   // 마스터 매니페스트 URL (Cloudflare R2)
@@ -436,5 +437,104 @@ class FilterDataService {
   /// 업데이트 콜백 설정
   static void setUpdateCallback(VoidCallback? callback) {
     _updateCallback = callback;
+  }
+
+  /// 개별 필터의 매니페스트 버전 체크 (원격 vs 로컬) - 캐싱 우선 전략
+  static Future<bool> checkFilterVersionUpdate(String filterId) async {
+    // 1단계: 캐시 확인 (1시간 이내 결과가 있으면 즉시 반환)
+    const cacheDuration = Duration(hours: 1);
+    
+    final isCacheFresh = await AssetCacheService.isVersionCheckFresh(filterId, cacheDuration);
+    if (isCacheFresh) {
+      final cachedResult = await AssetCacheService.getVersionCheckResult(filterId);
+      if (cachedResult != null) {
+        print('⚡ 캐시된 버전 체크 결과 사용: $filterId → ${cachedResult.needsUpdate ? "업데이트 필요" : "최신"} (${DateTime.now().difference(cachedResult.timestamp).inMinutes}분 전 체크)');
+        return cachedResult.needsUpdate;
+      }
+    }
+    
+    // 2단계: 네트워크 기반 버전 체크 (캐시가 없거나 오래된 경우)
+    print('🌐 네트워크 기반 버전 체크 시작: $filterId');
+    
+    try {
+      // 1. 마스터 매니페스트에서 해당 필터 정보 가져오기
+      final masterManifest = await _loadMasterManifest();
+      if (masterManifest == null) {
+        print('❌ 마스터 매니페스트가 없어서 버전 체크 불가: $filterId');
+        return false;
+      }
+
+      final filterInfo = masterManifest.getFilterByGameId(filterId);
+      if (filterInfo == null || !filterInfo.isEnabled) {
+        print('❌ 필터를 찾을 수 없거나 비활성화됨: $filterId');
+        return false;
+      }
+
+      // 2. 원격 개별 매니페스트 다운로드
+      final manifestUrl = masterManifest.getFullManifestUrl(filterInfo.manifestUrl);
+      print('🔍 필터 버전 체크: $filterId → $manifestUrl');
+
+      _initializeDio();
+      
+      final response = await _dio.get(
+        manifestUrl,
+        options: Options(
+          headers: {
+            'Accept': 'application/json',
+            'Cache-Control': 'no-cache',
+          },
+          receiveTimeout: const Duration(seconds: 10),
+        ),
+      );
+
+      if (response.statusCode != 200) {
+        print('❌ 원격 매니페스트 다운로드 실패: ${response.statusCode}');
+        return false;
+      }
+
+      // 3. 원격 매니페스트에서 버전 추출
+      final jsonData = response.data as Map<String, dynamic>;
+      final remoteVersion = jsonData['version'] as String?;
+      
+      if (remoteVersion == null) {
+        print('⚠️ 원격 매니페스트에서 버전 정보 없음: $filterId');
+        return false;
+      }
+
+      // 4. 로컬에 저장된 버전과 비교
+      final localVersion = await AssetCacheService.getFilterVersion(filterId);
+      
+      if (localVersion == null) {
+        print('📝 로컬 버전 정보 없음, 새 다운로드 필요: $filterId');
+        return true; // 처음 다운로드하는 경우
+      }
+
+      final needsUpdate = remoteVersion != localVersion;
+      
+      if (needsUpdate) {
+        print('🆕 버전 업데이트 필요: $filterId ($localVersion → $remoteVersion)');
+      } else {
+        print('✅ 최신 버전임: $filterId (v$localVersion)');
+      }
+      
+      // 3단계: 네트워크 체크 결과를 캐시에 저장
+      await AssetCacheService.setVersionCheckResult(filterId, needsUpdate);
+      print('💾 버전 체크 결과 캐시 저장: $filterId = ${needsUpdate ? "업데이트 필요" : "최신"}');
+      
+      return needsUpdate;
+      
+    } catch (e) {
+      print('❌ 필터 버전 체크 실패: $filterId - $e');
+      
+      // 네트워크 오류 시 캐시된 결과가 있으면 사용 (복원력 강화)
+      final cachedResult = await AssetCacheService.getVersionCheckResult(filterId);
+      if (cachedResult != null) {
+        print('🔄 네트워크 오류로 캐시된 결과 사용: $filterId = ${cachedResult.needsUpdate ? "업데이트 필요" : "최신"}');
+        return cachedResult.needsUpdate;
+      }
+      
+      // 캐시도 없으면 업데이트 불필요로 판단 (기존 동작 유지)
+      return false;
+    }
   }
 }

@@ -132,9 +132,9 @@ class FilterNotifier extends StateNotifier<FilterState> {
     await _loadCategories();
   }
 
-  Future<void> startDownload(String filterId, String manifestPath) async {
+  Future<void> startDownload(String filterId, String manifestPath, {bool isUpdate = false}) async {
     final assetNotifier = _ref.read(assetProvider.notifier);
-    await assetNotifier.startDownload(filterId, manifestPath);
+    await assetNotifier.startDownload(filterId, manifestPath, isUpdate: isUpdate);
     // 다운로드 시작 즉시 상태 새로고침
     await refreshCategories();
   }

@@ -65,10 +65,38 @@ class _RankingFilterListScreenState
     final downloadStatus = ref.read(downloadStatusProvider(filter.id));
     final isDownloaded = downloadStatus == DownloadStatus.downloaded;
 
-    // 다운로드 상태 확인
-    if (!isDownloaded && filter.manifestPath != null) {
-      // 다운로드가 필요한 경우 다운로드 다이얼로그 표시
-      _showDownloadDialog(context, ref, filter);
+    // 버전 업데이트 체크 (다운로드된 필터도 체크)
+    bool needsUpdate = false;
+    if (isDownloaded && filter.manifestPath != null) {
+      try {
+        needsUpdate = await FilterDataService.checkFilterVersionUpdate(filter.id);
+      } catch (e) {
+        print('⚠️ 버전 체크 실패, 기존 동작 유지: $e');
+      }
+    }
+
+    // 업데이트 처리: 기존 에셋 먼저 삭제
+    if (needsUpdate && filter.manifestPath != null) {
+      print('🔄 필터 업데이트 시작: ${filter.name} (${filter.id})');
+      try {
+        // 기존 다운로드된 에셋 완전 삭제
+        await ref.read(assetProvider.notifier).deleteAssets(filter.id);
+        print('🗑️ 기존 에셋 삭제 완료: ${filter.id}');
+      } catch (e) {
+        print('❌ 기존 에셋 삭제 실패: $e');
+        if (context.mounted) {
+          _showErrorDialog(context, '업데이트 준비 실패: $e');
+        }
+        return;
+      }
+    }
+
+    // 다운로드 상태 확인 (업데이트 또는 신규 다운로드)
+    if ((!isDownloaded || needsUpdate) && filter.manifestPath != null) {
+      // 다운로드가 필요한 경우 또는 업데이트가 필요한 경우 다운로드 다이얼로그 표시
+      if (context.mounted) {
+        _showDownloadDialog(context, ref, filter, isUpdate: needsUpdate);
+      }
       return;
     }
 
@@ -84,7 +112,7 @@ class _RankingFilterListScreenState
   }
 
   Future<void> _startDownload(
-      BuildContext context, WidgetRef ref, FilterItem filter) async {
+      BuildContext context, WidgetRef ref, FilterItem filter, {bool isUpdate = false}) async {
     if (filter.manifestPath == null) {
       _showErrorDialog(context, '다운로드 정보가 없습니다.');
       return;
@@ -93,13 +121,13 @@ class _RankingFilterListScreenState
     try {
       await ref
           .read(filterProvider.notifier)
-          .startDownload(filter.id, filter.manifestPath!);
+          .startDownload(filter.id, filter.manifestPath!, isUpdate: isUpdate);
 
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              '${filter.name} 다운로드가 시작되었습니다.',
+              '${filter.name} ${isUpdate ? "업데이트" : "다운로드"}가 시작되었습니다.',
               style: const TextStyle(
                 color: ThemeColors.neoSeoulNight,
                 fontWeight: FontWeight.w600,
@@ -117,7 +145,7 @@ class _RankingFilterListScreenState
       }
     } catch (e) {
       if (context.mounted) {
-        _showErrorDialog(context, '다운로드 시작 실패: $e');
+        _showErrorDialog(context, '${isUpdate ? "업데이트" : "다운로드"} 시작 실패: $e');
       }
     }
   }
@@ -182,7 +210,7 @@ class _RankingFilterListScreenState
   }
 
   void _showDownloadDialog(
-      BuildContext context, WidgetRef ref, FilterItem filter) {
+      BuildContext context, WidgetRef ref, FilterItem filter, {bool isUpdate = false}) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -210,7 +238,7 @@ class _RankingFilterListScreenState
               ),
               child: AlertDialog(
                 title: Text(
-                  '${filter.name} 다운로드',
+                  isUpdate ? '${filter.name} 업데이트' : '${filter.name} 다운로드',
                   style: const TextStyle(
                     color: ThemeColors.white,
                     fontWeight: FontWeight.bold,
@@ -246,9 +274,11 @@ class _RankingFilterListScreenState
                         ),
                       ),
                     ] else ...[
-                      const Text(
-                        '이 필터를 사용하려면 애셋을 다운로드해야 합니다.',
-                        style: TextStyle(
+                      Text(
+                        isUpdate 
+                          ? '새 버전이 있습니다. 업데이트하시겠습니까?'
+                          : '이 필터를 사용하려면 애셋을 다운로드해야 합니다.',
+                        style: const TextStyle(
                           color: ThemeColors.lightLavender,
                           fontSize: 14,
                           height: 1.4,
@@ -320,7 +350,7 @@ class _RankingFilterListScreenState
                     ElevatedButton(
                       onPressed: () {
                         Navigator.of(context).pop();
-                        _startDownload(context, ref, filter);
+                        _startDownload(context, ref, filter, isUpdate: isUpdate);
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: ThemeColors.neonBladeBlue,
@@ -334,9 +364,9 @@ class _RankingFilterListScreenState
                           borderRadius: BorderRadius.circular(8),
                         ),
                       ),
-                      child: const Text(
-                        '다운로드',
-                        style: TextStyle(
+                      child: Text(
+                        isUpdate ? '업데이트' : '다운로드',
+                        style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 14,
                         ),

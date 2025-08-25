@@ -6,6 +6,9 @@ class AssetCacheService {
   static const String _downloadProgressPrefix = 'download_progress_';
   static const String _manifestPathPrefix = 'manifest_path_';
   static const String _lastUpdatePrefix = 'last_update_';
+  static const String _filterVersionPrefix = 'filter_version_';
+  static const String _versionCheckTimePrefix = 'version_check_time_';
+  static const String _versionCheckResultPrefix = 'version_check_result_';
   static const String _downloadedGamesKey = 'downloaded_games';
 
   static Future<SharedPreferences> _getPrefs() async {
@@ -81,6 +84,61 @@ class AssetCacheService {
     return null;
   }
 
+  // 필터 버전 관리 메서드들
+  static Future<void> setFilterVersion(String filterId, String version) async {
+    final prefs = await _getPrefs();
+    await prefs.setString('$_filterVersionPrefix$filterId', version);
+  }
+
+  static Future<String?> getFilterVersion(String filterId) async {
+    final prefs = await _getPrefs();
+    return prefs.getString('$_filterVersionPrefix$filterId');
+  }
+
+  // 버전 체크 캐싱 관련 메서드들
+  static Future<void> setVersionCheckResult(String filterId, bool needsUpdate) async {
+    final prefs = await _getPrefs();
+    final now = DateTime.now();
+    
+    await prefs.setBool('$_versionCheckResultPrefix$filterId', needsUpdate);
+    await prefs.setString('$_versionCheckTimePrefix$filterId', now.toIso8601String());
+  }
+
+  static Future<({bool needsUpdate, DateTime timestamp})?> getVersionCheckResult(String filterId) async {
+    final prefs = await _getPrefs();
+    
+    final needsUpdate = prefs.getBool('$_versionCheckResultPrefix$filterId');
+    final timestampString = prefs.getString('$_versionCheckTimePrefix$filterId');
+    
+    if (needsUpdate == null || timestampString == null) {
+      return null;
+    }
+    
+    try {
+      final timestamp = DateTime.parse(timestampString);
+      return (needsUpdate: needsUpdate, timestamp: timestamp);
+    } catch (e) {
+      // 파싱 실패 시 캐시 무효화
+      await clearVersionCheck(filterId);
+      return null;
+    }
+  }
+
+  static Future<bool> isVersionCheckFresh(String filterId, Duration maxAge) async {
+    final result = await getVersionCheckResult(filterId);
+    
+    if (result == null) return false;
+    
+    final age = DateTime.now().difference(result.timestamp);
+    return age <= maxAge;
+  }
+
+  static Future<void> clearVersionCheck(String filterId) async {
+    final prefs = await _getPrefs();
+    await prefs.remove('$_versionCheckResultPrefix$filterId');
+    await prefs.remove('$_versionCheckTimePrefix$filterId');
+  }
+
   static Future<void> addDownloadedGame(String gameId) async {
     final prefs = await _getPrefs();
     final downloadedGames = await getDownloadedGames();
@@ -141,6 +199,9 @@ class AssetCacheService {
     await prefs.remove('$_downloadProgressPrefix$filterId');
     await prefs.remove('$_manifestPathPrefix$filterId');
     await prefs.remove('$_lastUpdatePrefix$filterId');
+    await prefs.remove('$_filterVersionPrefix$filterId');
+    await prefs.remove('$_versionCheckResultPrefix$filterId');
+    await prefs.remove('$_versionCheckTimePrefix$filterId');
     
     await removeDownloadedGame(filterId);
   }
@@ -154,6 +215,9 @@ class AssetCacheService {
           key.startsWith(_downloadProgressPrefix) ||
           key.startsWith(_manifestPathPrefix) ||
           key.startsWith(_lastUpdatePrefix) ||
+          key.startsWith(_filterVersionPrefix) ||
+          key.startsWith(_versionCheckResultPrefix) ||
+          key.startsWith(_versionCheckTimePrefix) ||
           key == _downloadedGamesKey) {
         await prefs.remove(key);
       }

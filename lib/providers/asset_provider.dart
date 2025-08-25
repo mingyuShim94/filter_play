@@ -106,11 +106,27 @@ class AssetNotifier extends StateNotifier<AssetDownloadState> {
     }
   }
 
-  Future<void> startDownload(String filterId, String manifestPath) async {
+  Future<void> startDownload(String filterId, String manifestPath, {bool isUpdate = false}) async {
     print('🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥');
-    print('🚀🎊 다운로드 시작 요청: $filterId');
+    print('🚀🎊 ${isUpdate ? "업데이트" : "다운로드"} 시작 요청: $filterId');
     print('📍📦 매니페스트 경로: $manifestPath');
+    if (isUpdate) {
+      print('🔄 업데이트 모드: 강화된 캐시 정리 및 파일 덮어쓰기');
+    }
     print('🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥');
+
+    // 업데이트 모드인 경우 추가적인 캐시 정리
+    if (isUpdate) {
+      try {
+        print('🧹 업데이트 모드: 매니페스트 캐시 정리 시작');
+        final manifestCache = ManifestCacheService();
+        manifestCache.invalidateCache(filterId);
+        await AssetCacheService.clearFilterCache(filterId);
+        print('✅ 업데이트 준비: 모든 캐시 정리 완료');
+      } catch (e) {
+        print('⚠️ 캐시 정리 중 오류 (계속 진행): $e');
+      }
+    }
 
     try {
       _updateDownloadStatus(filterId, DownloadStatus.downloading);
@@ -143,7 +159,12 @@ class AssetNotifier extends StateNotifier<AssetDownloadState> {
           final manifestCache = ManifestCacheService();
           manifestCache.onFilterDownloaded(filterId);
           
+          // 다운로드 완료 시 버전 정보 저장
+          print('💾 다운로드 완료: 버전 정보 저장 시작...');
+          _saveFilterVersion(filterId);
+          
           // 다운로드 완료 콜백 호출
+          print('📞 다운로드 완료 콜백 호출: $filterId');
           _onDownloadComplete?.call(filterId);
         },
         onError: (error) {
@@ -303,6 +324,34 @@ class AssetNotifier extends StateNotifier<AssetDownloadState> {
 
   void setDownloadCompleteCallback(Function(String) callback) {
     _onDownloadComplete = callback;
+  }
+
+  /// 다운로드 완료 시 필터 버전 정보 저장
+  Future<void> _saveFilterVersion(String filterId) async {
+    try {
+      print('🔍 로컬 매니페스트 조회 중: $filterId');
+      // 로컬에 저장된 매니페스트에서 버전 정보 추출
+      final manifest = await AssetDownloadService.getLocalManifest(filterId);
+      if (manifest != null) {
+        print('📋 매니페스트 발견: ${manifest.gameTitle} v${manifest.version}');
+        await AssetCacheService.setFilterVersion(filterId, manifest.version);
+        print('✅ 필터 버전 저장 완료: $filterId v${manifest.version}');
+        
+        // 저장된 버전 확인 (검증용)
+        final savedVersion = await AssetCacheService.getFilterVersion(filterId);
+        print('🔎 저장 검증: $filterId = v${savedVersion}');
+        
+        // 다운로드 완료로 버전 캐시 무효화 (새 버전이므로 다음 체크 시 다시 확인 필요)
+        await AssetCacheService.clearVersionCheck(filterId);
+        print('🧹 버전 체크 캐시 무효화: $filterId (새 버전으로 업데이트됨)');
+      } else {
+        print('⚠️ 필터 매니페스트를 찾을 수 없음: $filterId');
+        print('💡 힌트: 매니페스트가 다운로드되지 않았거나 파일이 손상되었을 수 있습니다');
+      }
+    } catch (e) {
+      print('❌ 필터 버전 저장 실패: $filterId - $e');
+      print('🔧 디버깅: 로컬 파일 시스템 또는 권한 문제일 수 있습니다');
+    }
   }
 
   @override
