@@ -94,32 +94,41 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
     print('🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮');
     print('🎮🔥 랭킹 게임 초기화 시작');
     print('🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮');
-    
+
     // 현재 선택된 필터 정보 가져오기
     final selectedFilter = ref.read(selectedFilterProvider);
-    
+
     if (selectedFilter != null) {
       print('🎮✅ 선택된 필터: ${selectedFilter.id} (${selectedFilter.name})');
-      
+
       // 선택된 필터의 캐릭터 데이터 로드
-      final characters = await RankingDataService.getCharactersByGameId(selectedFilter.id);
-      
+      final characters =
+          await RankingDataService.getCharactersByGameId(selectedFilter.id);
+
       if (characters.isNotEmpty) {
         print('🎮🎯 캐릭터 로드 성공: ${characters.length}개');
-        ref.read(rankingGameProvider.notifier).startGame(selectedFilter.id, characters);
+        ref
+            .read(rankingGameProvider.notifier)
+            .startGame(selectedFilter.id, characters);
       } else {
         print('🎮⚠️ 캐릭터 데이터가 없음, 기본값 사용');
         // 기본값으로 폴백
-        final defaultCharacters = await RankingDataService.getKpopDemonHuntersCharacters();
-        ref.read(rankingGameProvider.notifier).startGame('all_characters', defaultCharacters);
+        final defaultCharacters =
+            await RankingDataService.getKpopDemonHuntersCharacters();
+        ref
+            .read(rankingGameProvider.notifier)
+            .startGame('all_characters', defaultCharacters);
       }
     } else {
       print('🎮❌ 선택된 필터가 없음, 기본값 사용');
       // 선택된 필터가 없으면 기본값 사용
-      final defaultCharacters = await RankingDataService.getKpopDemonHuntersCharacters();
-      ref.read(rankingGameProvider.notifier).startGame('all_characters', defaultCharacters);
+      final defaultCharacters =
+          await RankingDataService.getKpopDemonHuntersCharacters();
+      ref
+          .read(rankingGameProvider.notifier)
+          .startGame('all_characters', defaultCharacters);
     }
-    
+
     print('🎮🎉 랭킹 게임 초기화 완료');
   }
 
@@ -155,7 +164,7 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
       setState(() {
         _permissionRequested = true;
       });
-      
+
       final status = await Permission.camera.request();
       if (status == PermissionStatus.granted) {
         print("Camera permission granted, initializing cameras...");
@@ -180,7 +189,6 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
       }
     }
   }
-
 
   // 녹화용 권한 확인 및 요청
   Future<bool> _checkPermissions() async {
@@ -297,11 +305,12 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
           final currentRankingItem = ref.read(currentRankingItemProvider);
           final selectedFilter = ref.read(selectedFilterProvider);
           String? imagePath;
-          
+
           if (currentRankingItem?.assetKey != null && selectedFilter != null) {
             // 이미지 경로 Provider를 통한 단순화된 경로 계산
             final imagePathProvider = ref.read(getImagePathProvider);
-            final pathResult = await imagePathProvider(selectedFilter.id, currentRankingItem!.assetKey!);
+            final pathResult = await imagePathProvider(
+                selectedFilter.id, currentRankingItem!.assetKey!);
             imagePath = pathResult.path ?? currentRankingItem.imagePath;
           } else {
             // Fallback: 기본 이미지 경로 사용
@@ -498,8 +507,12 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
       final logicalWidth = screenSize.width.round();
       final logicalHeight = screenSize.height.round();
 
-      // RawRGBA 고해상도 캡처: devicePixelRatio 적용으로 물리적 픽셀 해상도 사용
-      ui.Image image = await boundary.toImage(pixelRatio: devicePixelRatio);
+      // 안정성을 위해 논리적 해상도로 캡처 (1.0 고정)
+      // TODO: 향후 점진적으로 최적화된 pixelRatio 적용 예정
+      const targetPixelRatio = 1.0;
+
+      // 논리적 해상도로 캡처 후 FFmpeg에서 다운스케일링
+      ui.Image image = await boundary.toImage(pixelRatio: targetPixelRatio);
 
       // RawRGBA 포맷으로 변환 (압축 없음, 고속 처리)
       ByteData? byteData =
@@ -511,15 +524,13 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
         // 해상도 분석 및 로깅
         final width = image.width;
         final height = image.height;
-        final resolutionGain =
-            (width * height) / (logicalWidth * logicalHeight);
 
-        print('\x1b[96m📱 해상도 분석:\x1b[0m');
+        print('\x1b[96m📱 캡처 해상도 분석:\x1b[0m');
         print('\x1b[96m  • 논리적 해상도: ${logicalWidth}x$logicalHeight\x1b[0m');
         print('\x1b[96m  • Device Pixel Ratio: $devicePixelRatio\x1b[0m');
-        print('\x1b[96m  • 캡처된 해상도: ${width}x$height\x1b[0m');
-        print(
-            '\x1b[96m  • 해상도 향상: ${resolutionGain.toStringAsFixed(1)}배\x1b[0m');
+        print('\x1b[96m  • 캡처 Pixel Ratio: ${targetPixelRatio.toStringAsFixed(1)} (안정화)\x1b[0m');
+        print('\x1b[96m  • 실제 캡처 해상도: ${width}x$height\x1b[0m');
+        print('\x1b[96m  • FFmpeg 최종 해상도: 360x696 (다운스케일링)\x1b[0m');
 
         final fileName =
             'frame_${(_frameCount + 1).toString().padLeft(5, '0')}_${width}x$height.raw';
@@ -946,8 +957,15 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
           '-f rawvideo -pixel_format rgba -video_size $videoSize -framerate ${actualFps.toStringAsFixed(2)} -i "$concatenatedRawPath"';
       // 오디오 볼륨을 2.5배 증폭시키는 필터 추가
       final audioFilter = '-af "volume=2.5"';
-      final videoOutput =
-          '-c:v libx264 -pix_fmt yuv420p -preset ultrafast -vf "scale=360:696"'; // yuv420p는 호환성이 좋음
+
+      // 플랫폼별 하드웨어 가속 비디오 인코더
+      final videoEncoder = Platform.isIOS
+          ? 'h264_videotoolbox' // iOS VideoToolbox 하드웨어 가속
+          : 'libx264'; // Android는 libx264 사용 (MediaCodec은 Flutter에서 제한적)
+
+      final videoOutput = Platform.isIOS
+          ? '-c:v $videoEncoder -realtime 1 -pix_fmt yuv420p -vf "scale=360:696"' // iOS: 하드웨어 가속 + 스케일링
+          : '-c:v $videoEncoder -preset ultrafast -crf 28 -g 30 -threads 0 -pix_fmt yuv420p -vf "scale=360:696"'; // Android: 최적화 + 스케일링
 
       if (audioFile.existsSync() && audioFile.lengthSync() > 0) {
         // 오디오 + 비디오 (볼륨 필터 적용)
@@ -960,14 +978,43 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
         print('🎬 📹 비디오(Raw) 전용 합성 모드');
       }
 
+      print(
+          '🎬 ⚡ ${Platform.isIOS ? "iOS VideoToolbox" : "Android libx264"} 하드웨어 가속 활성화');
       print('🎬 명령어: $command');
 
-      // 5. FFmpeg 실행 (기존 코드와 유사)
+      // 5. FFmpeg 실행 시간 측정
+      final ffmpegStartTime = DateTime.now();
+      print(
+          '🎬 ⏱️  FFmpeg 실행 시작: ${ffmpegStartTime.toIso8601String().split('T')[1].substring(0, 8)}');
+
       final session = await FFmpegKit.execute(command);
       final returnCode = await session.getReturnCode();
 
+      final ffmpegEndTime = DateTime.now();
+      final ffmpegDuration = ffmpegEndTime.difference(ffmpegStartTime);
+      print(
+          '🎬 ⏱️  FFmpeg 실행 완료: ${ffmpegEndTime.toIso8601String().split('T')[1].substring(0, 8)}');
+      print(
+          '🎬 📊 FFmpeg 처리 시간: ${ffmpegDuration.inSeconds}.${ffmpegDuration.inMilliseconds % 1000}초');
+
       if (ReturnCode.isSuccess(returnCode)) {
-        print('\x1b[92m🎉 동영상 합성 성공! (Raw 직접 처리) 🎉\x1b[0m');
+        print('\x1b[92m🎉 동영상 합성 성공! (최적화된 처리) 🎉\x1b[0m');
+
+        // 성능 개선 통계 출력
+        final framesPerSecond = ffmpegDuration.inMilliseconds > 0
+            ? (_frameCount * 1000) / ffmpegDuration.inMilliseconds
+            : 0.0;
+        print('\x1b[92m📊 최적화 성능 통계:\x1b[0m');
+        print(
+            '\x1b[92m  • 처리 속도: ${framesPerSecond.toStringAsFixed(1)} fps\x1b[0m');
+        print('\x1b[92m  • 총 프레임: $_frameCount개\x1b[0m');
+        print('\x1b[92m  • 총 처리 시간: ${ffmpegDuration.inSeconds}초\x1b[0m');
+        final outputFile = File(outputPath);
+        if (outputFile.existsSync()) {
+          final fileSizeMB = (outputFile.lengthSync() / (1024 * 1024));
+          print(
+              '\x1b[92m  • 출력 파일 크기: ${fileSizeMB.toStringAsFixed(1)}MB\x1b[0m');
+        }
 
         // 동영상 생성 성공 후 캡처한 프레임 파일들 정리
         await _cleanupRawFrames();
@@ -1091,7 +1138,9 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
                 children: [
                   Icon(
                     _permissionRequested
-                        ? (_permissionGranted ? Icons.camera_alt : Icons.camera_alt_outlined)
+                        ? (_permissionGranted
+                            ? Icons.camera_alt
+                            : Icons.camera_alt_outlined)
                         : Icons.camera_alt_outlined,
                     size: 64,
                     color: _permissionGranted ? Colors.green : Colors.grey,
@@ -1099,7 +1148,9 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
                   SizedBox(height: 16),
                   Text(
                     _permissionRequested
-                        ? (_permissionGranted ? "카메라 초기화 중..." : "카메라 권한이 필요합니다")
+                        ? (_permissionGranted
+                            ? "카메라 초기화 중..."
+                            : "카메라 권한이 필요합니다")
                         : "카메라 권한 요청 중...",
                     style: TextStyle(fontSize: 16),
                   ),
@@ -1139,7 +1190,9 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
                                 MediaQuery.of(context).size.width,
                                 MediaQuery.of(context).size.height,
                               ),
-                              currentItemName: ref.watch(currentRankingItemProvider)?.name ?? "",
+                              currentItemName:
+                                  ref.watch(currentRankingItemProvider)?.name ??
+                                      "",
                             ),
                           ),
                         // 랭킹 슬롯 패널 (왼쪽)
@@ -1417,6 +1470,6 @@ class ForeheadImagePainter extends CustomPainter {
   @override
   bool shouldRepaint(ForeheadImagePainter oldDelegate) {
     return oldDelegate.foreheadRectangle != foreheadRectangle ||
-           oldDelegate.currentItemName != currentItemName;
+        oldDelegate.currentItemName != currentItemName;
   }
 }
