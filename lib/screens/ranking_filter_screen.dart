@@ -1139,6 +1139,7 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
                                 MediaQuery.of(context).size.width,
                                 MediaQuery.of(context).size.height,
                               ),
+                              currentItemName: ref.watch(currentRankingItemProvider)?.name ?? "",
                             ),
                           ),
                         // 랭킹 슬롯 패널 (왼쪽)
@@ -1293,12 +1294,14 @@ class ForeheadImagePainter extends CustomPainter {
   final ForeheadRectangle foreheadRectangle;
   final Size imageSize;
   final Size screenSize;
+  final String currentItemName;
 
   ForeheadImagePainter({
     super.repaint,
     required this.foreheadRectangle,
     required this.imageSize,
     required this.screenSize,
+    required this.currentItemName,
   });
 
   @override
@@ -1374,12 +1377,46 @@ class ForeheadImagePainter extends CustomPainter {
       canvas.drawRect(drawRect, fillPaint);
     }
 
+    // 텍스트 오버레이 그리기
+    final textSpan = TextSpan(
+      text: currentItemName,
+      style: TextStyle(
+        color: Colors.white,
+        fontSize: scaledHeight * 0.15, // 사각형 높이의 15%
+        fontWeight: FontWeight.bold,
+        shadows: [
+          Shadow(
+            offset: Offset(1, 1),
+            blurRadius: 2,
+            color: Colors.black,
+          ),
+        ],
+      ),
+    );
+
+    final textPainter = TextPainter(
+      text: textSpan,
+      textAlign: TextAlign.center,
+      textDirection: TextDirection.ltr,
+    );
+
+    textPainter.layout();
+
+    // 텍스트를 사각형 하단에 위치
+    final textOffset = Offset(
+      -textPainter.width / 2,
+      scaledHeight / 2 - textPainter.height - 4, // 하단에서 4px 위
+    );
+
+    textPainter.paint(canvas, textOffset);
+
     // Canvas 복원
     canvas.restore();
   }
 
   @override
   bool shouldRepaint(ForeheadImagePainter oldDelegate) {
-    return oldDelegate.foreheadRectangle != foreheadRectangle;
+    return oldDelegate.foreheadRectangle != foreheadRectangle ||
+           oldDelegate.currentItemName != currentItemName;
   }
 }

@@ -33,6 +33,8 @@ class RankingSlotPanel extends ConsumerWidget {
                   padding: const EdgeInsets.only(bottom: 6),
                   child: Center(
                     child: RankingSlotWidget(
+                      key: ValueKey(
+                          'slot_${index}_${rankingSlots[index]?.id ?? 'empty'}'),
                       rank: index + 1,
                       item: rankingSlots[index],
                       onTap: () {
@@ -66,7 +68,7 @@ class RankingSlotWidget extends ConsumerWidget {
   final RankingItem? item;
   final VoidCallback onTap;
   final VoidCallback? onLongPress;
-  
+
   // 이미지 정보 캐시 (깜빡임 방지)
   static final Map<String, ui.Image> _imageInfoCache = {};
   static final Map<String, bool> _imageIsPortraitCache = {};
@@ -348,67 +350,22 @@ class RankingSlotWidget extends ConsumerWidget {
   }
 
   // 이미지 비율에 따른 조건부 크롭핑
-  Widget _buildConditionalCroppedImage(Widget imageWidget, ImagePathResult pathResult) {
+  Widget _buildConditionalCroppedImage(
+      Widget imageWidget, ImagePathResult pathResult) {
     // 이미지 파일이 있을 때만 크기 확인 수행
     if (pathResult.localPath != null) {
       final file = File(pathResult.localPath!);
       if (file.existsSync()) {
         final imagePath = file.path;
         final cachedPortraitInfo = _getCachedPortraitInfo(imagePath);
-        
+
         // 캐시된 정보가 있으면 즉시 적용 (깜빡임 방지)
         if (cachedPortraitInfo != null) {
           if (cachedPortraitInfo) {
-            // 세로가 긴 이미지: 절반 자르기 적용
-            return FittedBox(
-              fit: BoxFit.fill,
-              child: ClipRect(
-                child: Align(
-                  alignment: Alignment.topCenter,
-                  heightFactor: 0.5, // 세로로 절반 자르기
-                  child: imageWidget,
-                ),
-              ),
-            );
-          } else {
-            // 가로가 긴 이미지나 정사각형: 자연스럽게 크롭
-            return ClipRRect(
-              borderRadius: BorderRadius.circular(13),
-              child: SizedBox(
-                width: 54,
-                height: 54,
-                child: FittedBox(
-                  fit: BoxFit.cover,
-                  child: imageWidget,
-                ),
-              ),
-            );
-          }
-        }
-        
-        // 캐시된 정보가 없을 때만 FutureBuilder 사용
-        return FutureBuilder<ui.Image>(
-          future: _getImageInfo(file),
-          builder: (context, snapshot) {
-            if (snapshot.hasData && snapshot.data != null) {
-              final image = snapshot.data!;
-              final isPortrait = image.height > image.width;
-              
-              if (isPortrait) {
-                // 세로가 긴 이미지: 절반 자르기 적용
-                return FittedBox(
-                  fit: BoxFit.fill,
-                  child: ClipRect(
-                    child: Align(
-                      alignment: Alignment.topCenter,
-                      heightFactor: 0.5, // 세로로 절반 자르기
-                      child: imageWidget,
-                    ),
-                  ),
-                );
-              } else {
-                // 가로가 긴 이미지나 정사각형: 자연스럽게 크롭
-                return ClipRRect(
+            // 세로가 긴 이미지: 가로형과 동일한 자연스러운 크롭 적용
+            return Stack(
+              children: [
+                ClipRRect(
                   borderRadius: BorderRadius.circular(13),
                   child: SizedBox(
                     width: 54,
@@ -418,39 +375,255 @@ class RankingSlotWidget extends ConsumerWidget {
                       child: imageWidget,
                     ),
                   ),
+                ),
+                // 텍스트 오버레이
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 2,
+                  child: Align(
+                    alignment: Alignment.bottomCenter,
+                    child: Text(
+                      item?.name ?? '',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        shadows: [
+                          Shadow(
+                            offset: Offset(0.5, 0.5),
+                            blurRadius: 1,
+                            color: Colors.black,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          } else {
+            // 가로가 긴 이미지나 정사각형: 자연스럽게 크롭
+            return Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(13),
+                  child: SizedBox(
+                    width: 54,
+                    height: 54,
+                    child: FittedBox(
+                      fit: BoxFit.cover,
+                      child: imageWidget,
+                    ),
+                  ),
+                ),
+                // 텍스트 오버레이
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 2,
+                  child: Align(
+                    alignment: Alignment.bottomCenter,
+                    child: Text(
+                      item?.name ?? '',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        shadows: [
+                          Shadow(
+                            offset: Offset(0.5, 0.5),
+                            blurRadius: 1,
+                            color: Colors.black,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          }
+        }
+
+        // 캐시된 정보가 없을 때만 FutureBuilder 사용
+        return FutureBuilder<ui.Image>(
+          future: _getImageInfo(file),
+          builder: (context, snapshot) {
+            if (snapshot.hasData && snapshot.data != null) {
+              final image = snapshot.data!;
+              final isPortrait = image.height > image.width;
+
+              if (isPortrait) {
+                // 세로가 긴 이미지: 가로형과 동일한 자연스러운 크롭 적용
+                return Stack(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(13),
+                      child: SizedBox(
+                        width: 54,
+                        height: 54,
+                        child: FittedBox(
+                          fit: BoxFit.cover,
+                          child: imageWidget,
+                        ),
+                      ),
+                    ),
+                    // 텍스트 오버레이
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 2,
+                      child: Align(
+                        alignment: Alignment.bottomCenter,
+                        child: Text(
+                          item?.name ?? '',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            shadows: [
+                              Shadow(
+                                offset: Offset(0.5, 0.5),
+                                blurRadius: 1,
+                                color: Colors.black,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              } else {
+                // 가로가 긴 이미지나 정사각형: 자연스럽게 크롭
+                return Stack(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(13),
+                      child: SizedBox(
+                        width: 54,
+                        height: 54,
+                        child: FittedBox(
+                          fit: BoxFit.cover,
+                          child: imageWidget,
+                        ),
+                      ),
+                    ),
+                    // 텍스트 오버레이
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 2,
+                      child: Align(
+                        alignment: Alignment.bottomCenter,
+                        child: Text(
+                          item?.name ?? '',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            shadows: [
+                              Shadow(
+                                offset: Offset(0.5, 0.5),
+                                blurRadius: 1,
+                                color: Colors.black,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 );
               }
             }
-            
+
             // 이미지 정보 로딩 중: 이전 상태 유지를 위해 기본 크롭 적용
             // (원본 이미지가 깜빡이는 것을 방지)
-            return ClipRRect(
-              borderRadius: BorderRadius.circular(13),
-              child: SizedBox(
-                width: 54,
-                height: 54,
-                child: FittedBox(
-                  fit: BoxFit.cover,
-                  child: imageWidget,
+            return Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(13),
+                  child: SizedBox(
+                    width: 54,
+                    height: 54,
+                    child: FittedBox(
+                      fit: BoxFit.cover,
+                      child: imageWidget,
+                    ),
+                  ),
                 ),
-              ),
+                // 텍스트 오버레이
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 2,
+                  child: Align(
+                    alignment: Alignment.bottomCenter,
+                    child: Text(
+                      item?.name ?? '',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        shadows: [
+                          Shadow(
+                            offset: Offset(0.5, 0.5),
+                            blurRadius: 1,
+                            color: Colors.black,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             );
           },
         );
       }
     }
-    
+
     // 로컬 파일이 없는 경우 (리모트 이미지): 기본 BoxFit.cover 적용
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(13),
-      child: SizedBox(
-        width: 54,
-        height: 54,
-        child: FittedBox(
-          fit: BoxFit.cover,
-          child: imageWidget,
+    return Stack(
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(13),
+          child: SizedBox(
+            width: 54,
+            height: 54,
+            child: FittedBox(
+              fit: BoxFit.cover,
+              child: imageWidget,
+            ),
+          ),
         ),
-      ),
+        // 텍스트 오버레이
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 2,
+          child: Align(
+            alignment: Alignment.bottomCenter,
+            child: Text(
+              item?.name ?? '',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                shadows: [
+                  Shadow(
+                    offset: Offset(0.5, 0.5),
+                    blurRadius: 1,
+                    color: Colors.black,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -458,26 +631,28 @@ class RankingSlotWidget extends ConsumerWidget {
   // 이미지 정보를 캐시와 함께 가져오기 (깜빡임 방지)
   Future<ui.Image> _getImageInfo(File imageFile) async {
     final imagePath = imageFile.path;
-    
+    final cacheKey = '${item?.id ?? 'unknown'}_$imagePath';
+
     // 이미 캐시된 정보가 있으면 즉시 반환
-    if (_imageInfoCache.containsKey(imagePath)) {
-      return _imageInfoCache[imagePath]!;
+    if (_imageInfoCache.containsKey(cacheKey)) {
+      return _imageInfoCache[cacheKey]!;
     }
-    
+
     final bytes = await imageFile.readAsBytes();
     final codec = await ui.instantiateImageCodec(bytes);
     final frame = await codec.getNextFrame();
-    
+
     // 캐시에 저장 (이미지 정보와 세로/가로 여부 모두)
-    _imageInfoCache[imagePath] = frame.image;
-    _imageIsPortraitCache[imagePath] = frame.image.height > frame.image.width;
-    
+    _imageInfoCache[cacheKey] = frame.image;
+    _imageIsPortraitCache[cacheKey] = frame.image.height > frame.image.width;
+
     return frame.image;
   }
-  
+
   // 캐시된 세로/가로 정보 즉시 확인 (로딩 없이)
   bool? _getCachedPortraitInfo(String imagePath) {
-    return _imageIsPortraitCache[imagePath];
+    final cacheKey = '${item?.id ?? 'unknown'}_$imagePath';
+    return _imageIsPortraitCache[cacheKey];
   }
 
   Color _getRankColor(int rank) {
