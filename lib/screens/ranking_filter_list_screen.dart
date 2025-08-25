@@ -91,7 +91,7 @@ class _RankingFilterListScreenState
       } catch (e) {
         print('❌ 기존 에셋 삭제 실패: $e');
         if (context.mounted) {
-          _showErrorDialog(context, '업데이트 준비 실패: $e');
+          _showErrorDialog(context, 'Failed to prepare update: $e');
         }
         return;
       }
@@ -120,7 +120,7 @@ class _RankingFilterListScreenState
   Future<void> _startDownload(
       BuildContext context, WidgetRef ref, FilterItem filter, {bool isUpdate = false}) async {
     if (filter.manifestPath == null) {
-      _showErrorDialog(context, '다운로드 정보가 없습니다.');
+      _showErrorDialog(context, 'No download information available.');
       return;
     }
 
@@ -136,7 +136,7 @@ class _RankingFilterListScreenState
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              '${filter.name} ${isUpdate ? "업데이트" : "다운로드"}가 시작되었습니다.',
+              '${filter.name} ${isUpdate ? "update" : "download"} started.',
               style: const TextStyle(
                 color: ThemeColors.neoSeoulNight,
                 fontWeight: FontWeight.w600,
@@ -157,7 +157,7 @@ class _RankingFilterListScreenState
       ref.read(assetProvider.notifier).updateDownloadStatus(filter.id, DownloadStatus.failed);
       
       if (context.mounted) {
-        _showErrorDialog(context, '${isUpdate ? "업데이트" : "다운로드"} 시작 실패: $e');
+        _showErrorDialog(context, 'Failed to start ${isUpdate ? "update" : "download"}: $e');
       }
     }
   }
@@ -183,7 +183,7 @@ class _RankingFilterListScreenState
           ),
           child: AlertDialog(
             title: const Text(
-              '준비중',
+              'Coming Soon',
               style: TextStyle(
                 color: ThemeColors.white,
                 fontWeight: FontWeight.bold,
@@ -191,7 +191,7 @@ class _RankingFilterListScreenState
               ),
             ),
             content: Text(
-              '${filter.name} 필터는 현재 준비중입니다.\n곧 만나보실 수 있어요!',
+              '${filter.name} filter is currently in development.\nComing soon!',
               style: const TextStyle(
                 color: ThemeColors.lightLavender,
                 fontSize: 14,
@@ -207,7 +207,7 @@ class _RankingFilterListScreenState
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 ),
                 child: const Text(
-                  '확인',
+                  'OK',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 14,
@@ -243,7 +243,7 @@ class _RankingFilterListScreenState
           ),
           child: AlertDialog(
             title: const Text(
-              '오류',
+              'Error',
               style: TextStyle(
                 color: ThemeColors.hunterPink,
                 fontWeight: FontWeight.bold,
@@ -267,7 +267,7 @@ class _RankingFilterListScreenState
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 ),
                 child: const Text(
-                  '확인',
+                  'OK',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 14,
@@ -291,7 +291,7 @@ class _RankingFilterListScreenState
         backgroundColor: ThemeColors.deepPurple,
         elevation: 0,
         title: Text(
-          _currentCategory?.name ?? '필터 선택',
+          _currentCategory?.name ?? 'Select Filter',
           style: const TextStyle(
             fontWeight: FontWeight.bold,
             color: ThemeColors.white,
@@ -312,7 +312,7 @@ class _RankingFilterListScreenState
           children: [
             // 필터 목록 제목
             Text(
-              '필터 선택',
+              'Select Filter',
               style: const TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w800,
@@ -343,7 +343,7 @@ class _RankingFilterListScreenState
                               ),
                               const SizedBox(height: 16),
                               Text(
-                                '아직 필터가 없습니다',
+                                'No filters available',
                                 style: const TextStyle(
                                   fontSize: 16,
                                   color: ThemeColors.lightLavender,
@@ -658,7 +658,7 @@ class _FilterCard extends ConsumerWidget {
     if (!filter.isEnabled) {
       return _StatusContainer(
         backgroundColor: Colors.orange.shade900.withValues(alpha: 0.8),
-        child: const Text('준비중',
+        child: const Text('Coming Soon',
             style: TextStyle(
                 color: Colors.white,
                 fontSize: 10,
@@ -703,7 +703,7 @@ class _FilterCard extends ConsumerWidget {
             children: [
               Icon(Icons.check, size: 12, color: Colors.black),
               SizedBox(width: 4),
-              Text('보유중',
+              Text('Owned',
                   style: TextStyle(
                       color: Colors.black,
                       fontSize: 10,
@@ -722,7 +722,7 @@ class _FilterCard extends ConsumerWidget {
             children: [
               Icon(Icons.error_outline, size: 12, color: Colors.white),
               SizedBox(width: 4),
-              Text('실패',
+              Text('Failed',
                   style: TextStyle(
                       color: Colors.white,
                       fontSize: 10,
@@ -746,7 +746,7 @@ class _FilterCard extends ConsumerWidget {
                 children: [
                   Icon(Icons.download, size: 12, color: Color(0xFF00E0FF)),
                   SizedBox(width: 4),
-                  Text('받기',
+                  Text('Download',
                       style: TextStyle(
                           color: Color(0xFF00E0FF),
                           fontSize: 10,
