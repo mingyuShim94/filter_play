@@ -374,49 +374,6 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
     return allBytes.done().buffer.asUint8List();
   }
 
-  // 프레임 캡처 함수 (단일 캡처용)
-  Future<void> _captureFrame() async {
-    try {
-      RenderRepaintBoundary boundary = _captureKey.currentContext!
-          .findRenderObject() as RenderRepaintBoundary;
-
-      ui.Image image = await boundary.toImage(pixelRatio: 1.0);
-      ByteData? byteData =
-          await image.toByteData(format: ui.ImageByteFormat.png);
-
-      if (byteData != null) {
-        Uint8List pngBytes = byteData.buffer.asUint8List();
-
-        // 저장할 디렉토리 가져오기
-        final directory = await getApplicationDocumentsDirectory();
-        final fileName = 'capture_${DateTime.now().millisecondsSinceEpoch}.png';
-        final file = File('${directory.path}/$fileName');
-
-        await file.writeAsBytes(pngBytes);
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('화면이 캡처되었습니다: $fileName'),
-              duration: const Duration(seconds: 3),
-            ),
-          );
-        }
-
-        print('캡처 완료: ${file.path}');
-      }
-    } catch (e) {
-      print('캡처 오류: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('캡처 실패: $e'),
-            duration: const Duration(seconds: 3),
-          ),
-        );
-      }
-    }
-  }
 
   // 녹화 시작
   Future<void> _startRecording() async {
@@ -1304,39 +1261,23 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
                 }
               },
             ),
-      floatingActionButton: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // 단일 캡처 버튼
-          FloatingActionButton(
-            heroTag: "capture",
-            onPressed: _isRecording || _isProcessing ? null : _captureFrame,
-            tooltip: '화면 캡처',
-            backgroundColor: _isRecording || _isProcessing ? Colors.grey : null,
-            child: const Icon(Icons.camera_alt),
-          ),
-          const SizedBox(height: 12),
-          // 녹화 시작/중지 버튼
-          FloatingActionButton(
-            heroTag: "recording",
-            onPressed: _isProcessing
-                ? null
-                : _isRecording
-                    ? _stopRecording
-                    : _startRecording,
-            tooltip: _isRecording ? '녹화 중지' : '녹화 시작',
-            backgroundColor: _isRecording
-                ? Colors.red
-                : _isProcessing
-                    ? Colors.grey
-                    : Colors.green,
-            child: Icon(_isRecording
-                ? Icons.stop
-                : _isProcessing
-                    ? Icons.hourglass_empty
-                    : Icons.videocam),
-          ),
-        ],
+      floatingActionButton: FloatingActionButton(
+        onPressed: _isProcessing
+            ? null
+            : _isRecording
+                ? _stopRecording
+                : _startRecording,
+        tooltip: _isRecording ? '녹화 중지' : '녹화 시작',
+        backgroundColor: _isRecording
+            ? Colors.red
+            : _isProcessing
+                ? Colors.grey
+                : Colors.green,
+        child: Icon(_isRecording
+            ? Icons.stop
+            : _isProcessing
+                ? Icons.hourglass_empty
+                : Icons.videocam),
       ),
     );
   }
