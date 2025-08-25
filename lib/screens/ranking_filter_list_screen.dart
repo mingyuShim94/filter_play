@@ -64,6 +64,12 @@ class _RankingFilterListScreenState
     // AssetProvider에서 실시간 다운로드 상태 확인
     final downloadStatus = ref.read(downloadStatusProvider(filter.id));
     final isDownloaded = downloadStatus == DownloadStatus.downloaded;
+    
+    // 이미 다운로드 중인 경우 중복 실행 방지
+    if (downloadStatus == DownloadStatus.downloading) {
+      print('⚠️ 이미 다운로드 중입니다: ${filter.name}');
+      return;
+    }
 
     // 버전 업데이트 체크 (다운로드된 필터도 체크)
     bool needsUpdate = false;
@@ -118,6 +124,9 @@ class _RankingFilterListScreenState
       return;
     }
 
+    // 다운로드 시작 전에 즉시 downloading 상태로 업데이트
+    ref.read(assetProvider.notifier).updateDownloadStatus(filter.id, DownloadStatus.downloading);
+
     try {
       await ref
           .read(filterProvider.notifier)
@@ -144,6 +153,9 @@ class _RankingFilterListScreenState
         );
       }
     } catch (e) {
+      // 에러 발생 시 상태를 실패로 복구
+      ref.read(assetProvider.notifier).updateDownloadStatus(filter.id, DownloadStatus.failed);
+      
       if (context.mounted) {
         _showErrorDialog(context, '${isUpdate ? "업데이트" : "다운로드"} 시작 실패: $e');
       }
@@ -466,9 +478,13 @@ class _FilterCard extends ConsumerWidget {
       // Card의 경계에 맞춰 자식 위젯(이미지 등)을 잘라냅니다.
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: onTap,
-        splashColor: hunterPinkShadow.withValues(alpha: 0.1),
-        highlightColor: hunterPinkShadow.withValues(alpha: 0.1),
+        onTap: downloadStatus == DownloadStatus.downloading ? null : onTap,
+        splashColor: downloadStatus == DownloadStatus.downloading 
+            ? Colors.transparent 
+            : hunterPinkShadow.withValues(alpha: 0.1),
+        highlightColor: downloadStatus == DownloadStatus.downloading 
+            ? Colors.transparent 
+            : hunterPinkShadow.withValues(alpha: 0.1),
         child: Stack(
           fit: StackFit.expand, // Stack의 자식들이 전체를 채우도록 함
           children: [
@@ -596,7 +612,22 @@ class _FilterCard extends ConsumerWidget {
               ),
             ),
 
-            // 4. 상태 표시 위젯 (다운로드, 준비중 등) - 오른쪽 상단에 배치
+            // 4. 다운로드 중일 때 오버레이 (클릭 비활성화 시각적 표시)
+            if (downloadStatus == DownloadStatus.downloading)
+              Positioned.fill(
+                child: Container(
+                  color: Colors.black.withValues(alpha: 0.3),
+                  child: const Center(
+                    child: Icon(
+                      Icons.downloading,
+                      color: Colors.white,
+                      size: 32,
+                    ),
+                  ),
+                ),
+              ),
+
+            // 5. 상태 표시 위젯 (다운로드, 준비중 등) - 오른쪽 상단에 배치
             Positioned(
               top: 6, // 가로형 카드에 맞게 위치 조정
               right: 8,

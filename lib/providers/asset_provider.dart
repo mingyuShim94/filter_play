@@ -271,6 +271,11 @@ class AssetNotifier extends StateNotifier<AssetDownloadState> {
     return AssetDownloadService.formatFileSize(bytes);
   }
 
+  // Public method for external status updates
+  void updateDownloadStatus(String filterId, DownloadStatus status) {
+    _updateDownloadStatus(filterId, status);
+  }
+
   void _updateDownloadStatus(String filterId, DownloadStatus status) {
     final newStatuses =
         Map<String, DownloadStatus>.from(state.downloadStatuses);
