@@ -374,8 +374,9 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
     return allBytes.done().buffer.asUint8List();
   }
 
-  // 프레임 캡처 함수 (단일 캡처용)
+  // 프레임 캡처 함수 (단일 캡처용) - 비활성화됨
   Future<void> _captureFrame() async {
+    return; // 단일 캡처 비활성화
     try {
       RenderRepaintBoundary boundary = _captureKey.currentContext!
           .findRenderObject() as RenderRepaintBoundary;
@@ -1127,6 +1128,66 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
     }
   }
 
+  // 중앙 하단 녹화 버튼 위젯
+  Widget _buildRecordButton() {
+    return GestureDetector(
+      onTap: _isProcessing
+          ? null
+          : _isRecording
+              ? _stopRecording
+              : _startRecording,
+      child: Container(
+        width: 80,
+        height: 80,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.black.withValues(alpha: 0.3),
+          border: Border.all(
+            color: Colors.white,
+            width: 4,
+          ),
+        ),
+        child: Center(
+          child: Container(
+            width: 60,
+            height: 60,
+            decoration: BoxDecoration(
+              shape: _isRecording ? BoxShape.rectangle : BoxShape.circle,
+              color: _isRecording
+                  ? Colors.red
+                  : _isProcessing
+                      ? Colors.grey
+                      : Colors.red,
+              borderRadius: _isRecording ? BorderRadius.circular(8) : null,
+            ),
+            child: _isProcessing
+                ? Center(
+                    child: SizedBox(
+                      width: 30,
+                      height: 30,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 3,
+                      ),
+                    ),
+                  )
+                : _isRecording
+                    ? Icon(
+                        Icons.stop,
+                        color: Colors.white,
+                        size: 30,
+                      )
+                    : Icon(
+                        Icons.videocam,
+                        color: Colors.white,
+                        size: 30,
+                      ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -1141,45 +1202,48 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
             ),
         ],
       ),
-      body: _initializeControllerFuture == null
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    _permissionRequested
-                        ? (_permissionGranted
-                            ? Icons.camera_alt
-                            : Icons.camera_alt_outlined)
-                        : Icons.camera_alt_outlined,
-                    size: 64,
-                    color: _permissionGranted ? Colors.green : Colors.grey,
+      body: Stack(
+        children: [
+          // 메인 카메라 화면 또는 권한 요청 화면
+          _initializeControllerFuture == null
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        _permissionRequested
+                            ? (_permissionGranted
+                                ? Icons.camera_alt
+                                : Icons.camera_alt_outlined)
+                            : Icons.camera_alt_outlined,
+                        size: 64,
+                        color: _permissionGranted ? Colors.green : Colors.grey,
+                      ),
+                      SizedBox(height: 16),
+                      Text(
+                        _permissionRequested
+                            ? (_permissionGranted
+                                ? "카메라 초기화 중..."
+                                : "카메라 권한이 필요합니다")
+                            : "카메라 권한 요청 중...",
+                        style: TextStyle(fontSize: 16),
+                      ),
+                      if (_permissionRequested && !_permissionGranted) ...[
+                        SizedBox(height: 8),
+                        Text(
+                          "설정에서 카메라 권한을 허용해주세요",
+                          style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                        ),
+                      ],
+                    ],
                   ),
-                  SizedBox(height: 16),
-                  Text(
-                    _permissionRequested
-                        ? (_permissionGranted
-                            ? "카메라 초기화 중..."
-                            : "카메라 권한이 필요합니다")
-                        : "카메라 권한 요청 중...",
-                    style: TextStyle(fontSize: 16),
-                  ),
-                  if (_permissionRequested && !_permissionGranted) ...[
-                    SizedBox(height: 8),
-                    Text(
-                      "설정에서 카메라 권한을 허용해주세요",
-                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                    ),
-                  ],
-                ],
-              ),
-            )
-          : FutureBuilder<void>(
-              future: _initializeControllerFuture,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.done &&
-                    _controller != null &&
-                    _controller!.value.isInitialized) {
+                )
+              : FutureBuilder<void>(
+                  future: _initializeControllerFuture,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.done &&
+                        _controller != null &&
+                        _controller!.value.isInitialized) {
                   return RepaintBoundary(
                     key: _captureKey,
                     child: Stack(
@@ -1314,23 +1378,17 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
                 }
               },
             ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _isProcessing
-            ? null
-            : _isRecording
-                ? _stopRecording
-                : _startRecording,
-        tooltip: _isRecording ? '녹화 중지' : '녹화 시작',
-        backgroundColor: _isRecording
-            ? Colors.red
-            : _isProcessing
-                ? Colors.grey
-                : Colors.green,
-        child: Icon(_isRecording
-            ? Icons.stop
-            : _isProcessing
-                ? Icons.hourglass_empty
-                : Icons.videocam),
+          // RepaintBoundary 밖에 배치된 녹화 버튼
+          if (_initializeControllerFuture != null)
+            Positioned(
+              bottom: 50,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: _buildRecordButton(),
+              ),
+            ),
+        ],
       ),
     );
   }
