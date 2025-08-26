@@ -26,6 +26,81 @@ import '../services/ranking_data_service.dart';
 import '../widgets/ranking_slot_panel.dart';
 import 'result_screen.dart';
 
+class CaptureData {
+  final int frameNumber;
+  final String filePath;
+  final Uint8List data;
+  final int width;
+  final int height;
+  final DateTime timestamp;
+
+  CaptureData({
+    required this.frameNumber,
+    required this.filePath,
+    required this.data,
+    required this.width,
+    required this.height,
+    required this.timestamp,
+  });
+}
+
+class AsyncFileWriter {
+  final Map<int, CaptureData> _pendingWrites = {};
+  final Set<int> _completedFrames = {};
+  int _nextFrameToProcess = 1;
+  bool _isProcessing = false;
+  static const int MAX_PENDING_FRAMES = 50;
+
+  Future<void> enqueue(int frameNumber, CaptureData data) async {
+    while (_pendingWrites.length >= MAX_PENDING_FRAMES) {
+      await Future.delayed(Duration(milliseconds: 5));
+      _processNextAvailableFrame();
+    }
+
+    _pendingWrites[frameNumber] = data;
+    _processNextAvailableFrame();
+  }
+
+  Future<void> _processNextAvailableFrame() async {
+    if (_isProcessing) return;
+    _isProcessing = true;
+
+    while (_pendingWrites.containsKey(_nextFrameToProcess)) {
+      final data = _pendingWrites.remove(_nextFrameToProcess)!;
+      await _writeFrameAtomically(data);
+      _completedFrames.add(_nextFrameToProcess);
+      _nextFrameToProcess++;
+    }
+
+    _isProcessing = false;
+  }
+
+  Future<void> _writeFrameAtomically(CaptureData data) async {
+    try {
+      final tempPath = '${data.filePath}.tmp';
+      final tempFile = File(tempPath);
+      await tempFile.writeAsBytes(data.data);
+      await tempFile.rename(data.filePath);
+    } catch (e) {
+      print('프레임 저장 실패: ${data.frameNumber} - $e');
+    }
+  }
+
+  Future<void> waitForAllFrames(int expectedCount) async {
+    while (_completedFrames.length < expectedCount) {
+      await Future.delayed(Duration(milliseconds: 10));
+      _processNextAvailableFrame();
+    }
+  }
+
+  void dispose() {
+    _pendingWrites.clear();
+    _completedFrames.clear();
+    _nextFrameToProcess = 1;
+    _isProcessing = false;
+  }
+}
+
 /// RankingFilterScreen is a ranking filter page.
 class RankingFilterScreen extends ConsumerStatefulWidget {
   /// Default Constructor
@@ -39,6 +114,9 @@ class RankingFilterScreen extends ConsumerStatefulWidget {
 class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
   // RepaintBoundary를 참조하기 위한 GlobalKey
   final GlobalKey _captureKey = GlobalKey();
+  
+  // 비동기 파일 I/O 시스템
+  late AsyncFileWriter _asyncFileWriter;
 
   CameraController? _controller;
   Future<void>? _initializeControllerFuture;
@@ -81,6 +159,10 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
   @override
   void initState() {
     super.initState();
+    
+    // AsyncFileWriter 초기화
+    _asyncFileWriter = AsyncFileWriter();
+    
     _requestPermissionsAndInitialize();
 
     // 위젯 트리 빌드 완료 후 랭킹 게임 초기화
@@ -140,6 +222,9 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
     _isCapturingFrame = false;
     _isRecording = false;
     _isConverting = false;
+
+    // AsyncFileWriter 리소스 정리
+    _asyncFileWriter.dispose();
 
     _controller?.dispose();
     _faceDetector.close();
@@ -547,13 +632,24 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
             'frame_${(_frameCount + 1).toString().padLeft(5, '0')}_${width}x$height.raw';
         final file = File('${_sessionDirectory!.path}/$fileName');
 
-        // RawRGBA 데이터 즉시 저장 (비압축이므로 빠름)
-        await file.writeAsBytes(rawBytes);
+        // 비동기 파일 I/O 큐에 등록 (빠른 처리)
+        final nextFrameNumber = _frameCount + 1;
+        await _asyncFileWriter.enqueue(
+          nextFrameNumber,
+          CaptureData(
+            frameNumber: nextFrameNumber,
+            filePath: file.path,
+            data: rawBytes,
+            width: width,
+            height: height,
+            timestamp: DateTime.now(),
+          ),
+        );
 
-        // setState 호출 전 mounted 체크
+        // enqueue 완료 후 프레임 카운트 증가
         if (mounted) {
           setState(() {
-            _frameCount++;
+            _frameCount = nextFrameNumber;
           });
         }
 
@@ -596,7 +692,7 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
     setState(() {
       _isRecording = false;
       _isProcessing = true;
-      _statusText = '녹화 완료, RawRGBA 프레임 변환 준비 중...';
+      _statusText = '녹화 완료, 프레임 저장 완료 대기 중...';
     });
 
     try {
@@ -607,7 +703,17 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
       // 오디오 녹음 중지
       await _audioRecorder.stop();
 
-      // RawRGBA → PNG 변환 후 FFmpeg 실행
+      // 모든 프레임이 파일로 저장될 때까지 대기
+      final expectedFrameCount = _frameCount;
+      print('⏳ 예상 프레임 수: $expectedFrameCount, 완료 대기 중...');
+      
+      await _asyncFileWriter.waitForAllFrames(expectedFrameCount);
+      
+      setState(() {
+        _statusText = '모든 프레임 저장 완료, FFmpeg 준비 중...';
+      });
+
+      // 모든 프레임 저장 완료 후 안전하게 FFmpeg 실행
       await _convertRawToPngAndCompose();
     } catch (e) {
       setState(() {
