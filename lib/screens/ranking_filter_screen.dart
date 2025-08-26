@@ -406,7 +406,8 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('중간 품질 캡처됨: ${image.width}x${image.height} (${fileSizeMB.toStringAsFixed(1)}MB)'),
+              content: Text(
+                  '중간 품질 캡처됨: ${image.width}x${image.height} (${fileSizeMB.toStringAsFixed(1)}MB)'),
               duration: const Duration(seconds: 3),
             ),
           );
@@ -536,7 +537,8 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
         print('\x1b[96m📱 캡처 해상도 분석:\x1b[0m');
         print('\x1b[96m  • 논리적 해상도: ${logicalWidth}x$logicalHeight\x1b[0m');
         print('\x1b[96m  • Device Pixel Ratio: $devicePixelRatio\x1b[0m');
-        print('\x1b[96m  • 캡처 Pixel Ratio: ${targetPixelRatio.toStringAsFixed(1)} (중간품질)\x1b[0m');
+        print(
+            '\x1b[96m  • 캡처 Pixel Ratio: ${targetPixelRatio.toStringAsFixed(1)} (중간품질)\x1b[0m');
         print('\x1b[96m  • 실제 캡처 해상도: ${width}x$height\x1b[0m');
         print('\x1b[96m  • FFmpeg 최종 해상도: 540x1044 (YUV420P 호환 크롭)\x1b[0m');
 
@@ -1312,39 +1314,23 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
                 }
               },
             ),
-      floatingActionButton: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // 단일 캡처 버튼
-          FloatingActionButton(
-            heroTag: "capture",
-            onPressed: _isRecording || _isProcessing ? null : _captureFrame,
-            tooltip: '화면 캡처',
-            backgroundColor: _isRecording || _isProcessing ? Colors.grey : null,
-            child: const Icon(Icons.camera_alt),
-          ),
-          const SizedBox(height: 12),
-          // 녹화 시작/중지 버튼
-          FloatingActionButton(
-            heroTag: "recording",
-            onPressed: _isProcessing
-                ? null
-                : _isRecording
-                    ? _stopRecording
-                    : _startRecording,
-            tooltip: _isRecording ? '녹화 중지' : '녹화 시작',
-            backgroundColor: _isRecording
-                ? Colors.red
-                : _isProcessing
-                    ? Colors.grey
-                    : Colors.green,
-            child: Icon(_isRecording
-                ? Icons.stop
-                : _isProcessing
-                    ? Icons.hourglass_empty
-                    : Icons.videocam),
-          ),
-        ],
+      floatingActionButton: FloatingActionButton(
+        onPressed: _isProcessing
+            ? null
+            : _isRecording
+                ? _stopRecording
+                : _startRecording,
+        tooltip: _isRecording ? '녹화 중지' : '녹화 시작',
+        backgroundColor: _isRecording
+            ? Colors.red
+            : _isProcessing
+                ? Colors.grey
+                : Colors.green,
+        child: Icon(_isRecording
+            ? Icons.stop
+            : _isProcessing
+                ? Icons.hourglass_empty
+                : Icons.videocam),
       ),
     );
   }
