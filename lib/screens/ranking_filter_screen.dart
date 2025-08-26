@@ -380,12 +380,21 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
       RenderRepaintBoundary boundary = _captureKey.currentContext!
           .findRenderObject() as RenderRepaintBoundary;
 
-      ui.Image image = await boundary.toImage(pixelRatio: 1.0);
+      // 중간 품질 캡처 (논리적 해상도 1.5배)
+      const targetPixelRatio = 1.5;
+      ui.Image image = await boundary.toImage(pixelRatio: targetPixelRatio);
       ByteData? byteData =
           await image.toByteData(format: ui.ImageByteFormat.png);
 
       if (byteData != null) {
         Uint8List pngBytes = byteData.buffer.asUint8List();
+
+        // 해상도 및 품질 정보 출력
+        final fileSizeMB = (pngBytes.length / (1024 * 1024));
+        print('📸 중간 품질 단일 캡처 완료:');
+        print('  • 픽셀 비율: ${targetPixelRatio.toStringAsFixed(1)}x (논리적)');
+        print('  • 캡처 해상도: ${image.width} x ${image.height}');
+        print('  • 파일 크기: ${fileSizeMB.toStringAsFixed(2)}MB');
 
         // 저장할 디렉토리 가져오기
         final directory = await getApplicationDocumentsDirectory();
@@ -397,7 +406,7 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('화면이 캡처되었습니다: $fileName'),
+              content: Text('중간 품질 캡처됨: ${image.width}x${image.height} (${fileSizeMB.toStringAsFixed(1)}MB)'),
               duration: const Duration(seconds: 3),
             ),
           );
@@ -507,9 +516,8 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
       final logicalWidth = screenSize.width.round();
       final logicalHeight = screenSize.height.round();
 
-      // 안정성을 위해 논리적 해상도로 캡처 (1.0 고정)
-      // TODO: 향후 점진적으로 최적화된 pixelRatio 적용 예정
-      const targetPixelRatio = 1.0;
+      // 중간 품질로 캡처 (단일 캡처와 동일한 1.5배)
+      const targetPixelRatio = 1.5;
 
       // 논리적 해상도로 캡처 후 FFmpeg에서 다운스케일링
       ui.Image image = await boundary.toImage(pixelRatio: targetPixelRatio);
@@ -528,9 +536,9 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
         print('\x1b[96m📱 캡처 해상도 분석:\x1b[0m');
         print('\x1b[96m  • 논리적 해상도: ${logicalWidth}x$logicalHeight\x1b[0m');
         print('\x1b[96m  • Device Pixel Ratio: $devicePixelRatio\x1b[0m');
-        print('\x1b[96m  • 캡처 Pixel Ratio: ${targetPixelRatio.toStringAsFixed(1)} (안정화)\x1b[0m');
+        print('\x1b[96m  • 캡처 Pixel Ratio: ${targetPixelRatio.toStringAsFixed(1)} (중간품질)\x1b[0m');
         print('\x1b[96m  • 실제 캡처 해상도: ${width}x$height\x1b[0m');
-        print('\x1b[96m  • FFmpeg 최종 해상도: 360x696 (다운스케일링)\x1b[0m');
+        print('\x1b[96m  • FFmpeg 최종 해상도: 540x1044 (YUV420P 호환 크롭)\x1b[0m');
 
         final fileName =
             'frame_${(_frameCount + 1).toString().padLeft(5, '0')}_${width}x$height.raw';
@@ -964,8 +972,8 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
           : 'libx264'; // Android는 libx264 사용 (MediaCodec은 Flutter에서 제한적)
 
       final videoOutput = Platform.isIOS
-          ? '-c:v $videoEncoder -realtime 1 -pix_fmt yuv420p -vf "scale=360:696"' // iOS: 하드웨어 가속 + 스케일링
-          : '-c:v $videoEncoder -preset ultrafast -crf 28 -g 30 -threads 0 -pix_fmt yuv420p -vf "scale=360:696"'; // Android: 최적화 + 스케일링
+          ? '-c:v $videoEncoder -realtime 1 -pix_fmt yuv420p -vf "crop=540:1044:0:0"' // iOS: 하드웨어 가속 + 크롭 (1.5배)
+          : '-c:v $videoEncoder -preset ultrafast -crf 28 -g 30 -threads 0 -pix_fmt yuv420p -vf "crop=540:1044:0:0"'; // Android: 최적화 + 크롭 (1.5배)
 
       if (audioFile.existsSync() && audioFile.lengthSync() > 0) {
         // 오디오 + 비디오 (볼륨 필터 적용)
