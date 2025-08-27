@@ -17,7 +17,9 @@ class RankingSlotPanel extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final rankingSlots = ref.watch(rankingSlotsProvider);
+    // 🔥 [최적화] 전체 리스트 대신 길이만 watch하여 리빌드 최소화
+    final itemCount = ref.watch(rankingSlotsProvider.select((slots) => slots.length));
+    final actualItemCount = itemCount > 0 ? itemCount : 10; // 초기 상태 고려
 
     return SizedBox(
       width: 120,
@@ -27,30 +29,15 @@ class RankingSlotPanel extends ConsumerWidget {
           Expanded(
             child: ListView.builder(
               padding: const EdgeInsets.symmetric(horizontal: 8),
-              itemCount: 10,
+              itemCount: actualItemCount,
               itemBuilder: (context, index) {
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 6),
                   child: Center(
                     child: RankingSlotWidget(
-                      key: ValueKey(
-                          'slot_${index}_${rankingSlots[index]?.id ?? 'empty'}'),
+                      key: ValueKey('slot_$index'), // 키 간소화
                       rank: index + 1,
-                      item: rankingSlots[index],
-                      onTap: () {
-                        ref
-                            .read(rankingGameProvider.notifier)
-                            .placeItemAtRank(index);
-                        onSlotTap?.call();
-                      },
-                      onLongPress: () {
-                        // 길게 누르면 아이템 제거 (재배치 기능)
-                        if (rankingSlots[index] != null) {
-                          ref
-                              .read(rankingGameProvider.notifier)
-                              .removeItemFromRank(index);
-                        }
-                      },
+                      onSlotTap: onSlotTap, // 콜백 전달
                     ),
                   ),
                 );
@@ -65,9 +52,8 @@ class RankingSlotPanel extends ConsumerWidget {
 
 class RankingSlotWidget extends ConsumerWidget {
   final int rank;
-  final RankingItem? item;
-  final VoidCallback onTap;
-  final VoidCallback? onLongPress;
+  // final RankingItem? item; // 🔥 [제거] 더 이상 부모로부터 item을 받지 않음
+  final VoidCallback? onSlotTap; // 🔥 [수정] onSlotTap 콜백을 받도록 변경
 
   // 이미지 정보 캐시 (깜빡임 방지)
   static final Map<String, ui.Image> _imageInfoCache = {};
@@ -76,19 +62,33 @@ class RankingSlotWidget extends ConsumerWidget {
   const RankingSlotWidget({
     super.key,
     required this.rank,
-    this.item,
-    required this.onTap,
-    this.onLongPress,
+    this.onSlotTap, // 🔥 [추가]
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // 🔥 [수정] 여기서 `select`를 사용하여 해당 인덱스의 아이템만 watch 합니다.
+    // 이렇게 하면 다른 슬롯이 변경되어도 이 위젯은 리빌드되지 않습니다.
+    final item = ref.watch(rankingSlotsProvider.select((slots) => 
+        slots.length > rank - 1 ? slots[rank - 1] : null));
     final isEmpty = item == null;
+
+    // 🔥 [수정] onTap과 onLongPress 로직을 위젯 내부로 이동
+    final onTap = () {
+      ref.read(rankingGameProvider.notifier).placeItemAtRank(rank - 1);
+      onSlotTap?.call();
+    };
+
+    final onLongPress = () {
+      if (item != null) {
+        ref.read(rankingGameProvider.notifier).removeItemFromRank(rank - 1);
+      }
+    };
 
     return GestureDetector(
       onTap: onTap,
       onLongPress: onLongPress,
-      child: isEmpty ? _buildEmptySlotLayout() : _buildSelectedSlotLayout(ref),
+      child: isEmpty ? _buildEmptySlotLayout() : _buildSelectedSlotLayout(ref, item),
     );
   }
 
@@ -139,7 +139,7 @@ class RankingSlotWidget extends ConsumerWidget {
   }
 
   // 선택된 슬롯 레이아웃 - Row로 숫자 영역과 이미지 영역 분리
-  Widget _buildSelectedSlotLayout(WidgetRef ref) {
+  Widget _buildSelectedSlotLayout(WidgetRef ref, RankingItem item) {
     final rankColor = _getRankColor(rank);
 
     return Row(
@@ -203,37 +203,37 @@ class RankingSlotWidget extends ConsumerWidget {
               ),
             ],
           ),
-          child: _buildSelectedSlot(ref),
+          child: _buildSelectedSlot(ref, item),
         ),
       ],
     );
   }
 
   // 선택된 슬롯 UI - 이미지만 표시 (숫자는 별도 영역에서 처리)
-  Widget _buildSelectedSlot(WidgetRef ref) {
+  Widget _buildSelectedSlot(WidgetRef ref, RankingItem item) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(13), // 컨테이너보다 살짝 작게
-      child: _buildItemImage(ref),
+      child: _buildItemImage(ref, item),
     );
   }
 
   // 이미지 빌드 - getImagePathProvider 사용하여 이마 위 이미지와 동일한 로직 적용
-  Widget _buildItemImage(WidgetRef ref) {
-    if (item?.assetKey != null) {
+  Widget _buildItemImage(WidgetRef ref, RankingItem item) {
+    if (item.assetKey != null) {
       // 현재 선택된 필터의 gameId 가져오기
       final selectedFilter = ref.watch(selectedFilterProvider);
 
       if (selectedFilter != null) {
         print(
-            '🎯 [RankingSlot] 이미지 로딩 시작: gameId=${selectedFilter.id}, assetKey=${item!.assetKey}');
+            '🎯 [RankingSlot] 이미지 로딩 시작: gameId=${selectedFilter.id}, assetKey=${item.assetKey}');
 
         // getImagePathProvider 사용하여 이마 위 이미지와 동일한 로직 적용
         final imagePathProvider = ref.read(getImagePathProvider);
 
         return FutureBuilder<ImagePathResult>(
           key: ValueKey(
-              '${selectedFilter.id}_${item!.assetKey}'), // 필터나 아이템 변경시 재빌드 보장
-          future: imagePathProvider(selectedFilter.id, item!.assetKey!),
+              '${selectedFilter.id}_${item.assetKey}'), // 필터나 아이템 변경시 재빌드 보장
+          future: imagePathProvider(selectedFilter.id, item.assetKey!),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               print('📍 [RankingSlot] 이미지 로딩 중...');
@@ -242,7 +242,7 @@ class RankingSlotWidget extends ConsumerWidget {
 
             if (snapshot.hasError) {
               print('❌ [RankingSlot] 이미지 로딩 에러: ${snapshot.error}');
-              return _buildFallbackImage();
+              return _buildFallbackImage(item);
             }
 
             if (snapshot.hasData) {
@@ -261,7 +261,7 @@ class RankingSlotWidget extends ConsumerWidget {
                     file,
                     errorBuilder: (context, error, stackTrace) {
                       print('❌ [RankingSlot] 로컬 이미지 로딩 실패: $error');
-                      return _buildFallbackImage();
+                      return _buildFallbackImage(item);
                     },
                   );
                 }
@@ -274,7 +274,7 @@ class RankingSlotWidget extends ConsumerWidget {
                   pathResult.remotePath!,
                   errorBuilder: (context, error, stackTrace) {
                     print('❌ [RankingSlot] 리모트 이미지 로딩 실패: $error');
-                    return _buildFallbackImage();
+                    return _buildFallbackImage(item);
                   },
                   loadingBuilder: (context, child, loadingProgress) {
                     if (loadingProgress == null) return child;
@@ -285,12 +285,12 @@ class RankingSlotWidget extends ConsumerWidget {
 
               // 이미지 비율에 따른 조건부 크롭핑
               if (imageWidget != null) {
-                return _buildConditionalCroppedImage(imageWidget, pathResult);
+                return _buildConditionalCroppedImage(imageWidget, pathResult, item);
               }
             }
 
             print('⚠️ [RankingSlot] 모든 이미지 로딩 실패, fallback 사용');
-            return _buildFallbackImage();
+            return _buildFallbackImage(item);
           },
         );
       } else {
@@ -301,14 +301,14 @@ class RankingSlotWidget extends ConsumerWidget {
     }
 
     // assetKey가 없거나 selectedFilter가 null이면 assets 이미지 시도
-    return _buildFallbackImage();
+    return _buildFallbackImage(item);
   }
 
   // Fallback 이미지 (assets 또는 기본 아이콘)
-  Widget _buildFallbackImage() {
-    if (item?.imagePath != null) {
+  Widget _buildFallbackImage(RankingItem item) {
+    if (item.imagePath != null) {
       return Image.asset(
-        item!.imagePath!,
+        item.imagePath!,
         fit: BoxFit.cover,
         alignment: Alignment.topCenter,
         errorBuilder: (context, error, stackTrace) {
@@ -351,13 +351,13 @@ class RankingSlotWidget extends ConsumerWidget {
 
   // 이미지 비율에 따른 조건부 크롭핑
   Widget _buildConditionalCroppedImage(
-      Widget imageWidget, ImagePathResult pathResult) {
+      Widget imageWidget, ImagePathResult pathResult, RankingItem item) {
     // 이미지 파일이 있을 때만 크기 확인 수행
     if (pathResult.localPath != null) {
       final file = File(pathResult.localPath!);
       if (file.existsSync()) {
         final imagePath = file.path;
-        final cachedPortraitInfo = _getCachedPortraitInfo(imagePath);
+        final cachedPortraitInfo = _getCachedPortraitInfo(imagePath, item);
 
         // 캐시된 정보가 있으면 즉시 적용 (깜빡임 방지)
         if (cachedPortraitInfo != null) {
@@ -384,7 +384,7 @@ class RankingSlotWidget extends ConsumerWidget {
                   child: Align(
                     alignment: Alignment.bottomCenter,
                     child: Text(
-                      item?.name ?? '',
+                      item.name,
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 10,
@@ -425,7 +425,7 @@ class RankingSlotWidget extends ConsumerWidget {
                   child: Align(
                     alignment: Alignment.bottomCenter,
                     child: Text(
-                      item?.name ?? '',
+                      item.name,
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 10,
@@ -448,7 +448,7 @@ class RankingSlotWidget extends ConsumerWidget {
 
         // 캐시된 정보가 없을 때만 FutureBuilder 사용
         return FutureBuilder<ui.Image>(
-          future: _getImageInfo(file),
+          future: _getImageInfo(file, item),
           builder: (context, snapshot) {
             if (snapshot.hasData && snapshot.data != null) {
               final image = snapshot.data!;
@@ -477,7 +477,7 @@ class RankingSlotWidget extends ConsumerWidget {
                       child: Align(
                         alignment: Alignment.bottomCenter,
                         child: Text(
-                          item?.name ?? '',
+                          item.name,
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 10,
@@ -518,7 +518,7 @@ class RankingSlotWidget extends ConsumerWidget {
                       child: Align(
                         alignment: Alignment.bottomCenter,
                         child: Text(
-                          item?.name ?? '',
+                          item.name,
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 10,
@@ -562,7 +562,7 @@ class RankingSlotWidget extends ConsumerWidget {
                   child: Align(
                     alignment: Alignment.bottomCenter,
                     child: Text(
-                      item?.name ?? '',
+                      item.name,
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 10,
@@ -607,7 +607,7 @@ class RankingSlotWidget extends ConsumerWidget {
           child: Align(
             alignment: Alignment.bottomCenter,
             child: Text(
-              item?.name ?? '',
+              item.name,
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 10,
@@ -629,9 +629,9 @@ class RankingSlotWidget extends ConsumerWidget {
 
   // 이미지 파일에서 크기 정보를 획득하는 헬퍼 메서드
   // 이미지 정보를 캐시와 함께 가져오기 (깜빡임 방지)
-  Future<ui.Image> _getImageInfo(File imageFile) async {
+  Future<ui.Image> _getImageInfo(File imageFile, RankingItem item) async {
     final imagePath = imageFile.path;
-    final cacheKey = '${item?.id ?? 'unknown'}_$imagePath';
+    final cacheKey = '${item.id}_$imagePath';
 
     // 이미 캐시된 정보가 있으면 즉시 반환
     if (_imageInfoCache.containsKey(cacheKey)) {
@@ -650,8 +650,8 @@ class RankingSlotWidget extends ConsumerWidget {
   }
 
   // 캐시된 세로/가로 정보 즉시 확인 (로딩 없이)
-  bool? _getCachedPortraitInfo(String imagePath) {
-    final cacheKey = '${item?.id ?? 'unknown'}_$imagePath';
+  bool? _getCachedPortraitInfo(String imagePath, RankingItem item) {
+    final cacheKey = '${item.id}_$imagePath';
     return _imageIsPortraitCache[cacheKey];
   }
 
