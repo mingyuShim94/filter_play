@@ -18,31 +18,34 @@ class RankingSlotPanel extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // 🔥 [최적화] 전체 리스트 대신 길이만 watch하여 리빌드 최소화
-    final itemCount = ref.watch(rankingSlotsProvider.select((slots) => slots.length));
+    final itemCount =
+        ref.watch(rankingSlotsProvider.select((slots) => slots.length));
     final actualItemCount = itemCount > 0 ? itemCount : 10; // 초기 상태 고려
 
     return SizedBox(
       width: 120,
       child: Column(
+        mainAxisSize: MainAxisSize.min, // 컨텐츠 크기에 맞춤
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           // 랭킹 슬롯들
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              itemCount: actualItemCount,
-              itemBuilder: (context, index) {
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Center(
-                    child: RankingSlotWidget(
-                      key: ValueKey('slot_$index'), // 키 간소화
-                      rank: index + 1,
-                      onSlotTap: onSlotTap, // 콜백 전달
-                    ),
+          ListView.builder(
+            shrinkWrap: true, // ListView가 컨텐츠 크기에 맞춤
+            physics: const NeverScrollableScrollPhysics(), // 스크롤 비활성화
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            itemCount: actualItemCount,
+            itemBuilder: (context, index) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Center(
+                  child: RankingSlotWidget(
+                    key: ValueKey('slot_$index'), // 키 간소화
+                    rank: index + 1,
+                    onSlotTap: onSlotTap, // 콜백 전달
                   ),
-                );
-              },
-            ),
+                ),
+              );
+            },
           ),
         ],
       ),
@@ -69,26 +72,28 @@ class RankingSlotWidget extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // 🔥 [수정] 여기서 `select`를 사용하여 해당 인덱스의 아이템만 watch 합니다.
     // 이렇게 하면 다른 슬롯이 변경되어도 이 위젯은 리빌드되지 않습니다.
-    final item = ref.watch(rankingSlotsProvider.select((slots) => 
-        slots.length > rank - 1 ? slots[rank - 1] : null));
+    final item = ref.watch(rankingSlotsProvider
+        .select((slots) => slots.length > rank - 1 ? slots[rank - 1] : null));
     final isEmpty = item == null;
 
     // 🔥 [수정] onTap과 onLongPress 로직을 위젯 내부로 이동
-    final onTap = () {
+    onTap() {
       ref.read(rankingGameProvider.notifier).placeItemAtRank(rank - 1);
       onSlotTap?.call();
-    };
+    }
 
-    final onLongPress = () {
+    onLongPress() {
       if (item != null) {
         ref.read(rankingGameProvider.notifier).removeItemFromRank(rank - 1);
       }
-    };
+    }
 
     return GestureDetector(
       onTap: onTap,
       onLongPress: onLongPress,
-      child: isEmpty ? _buildEmptySlotLayout() : _buildSelectedSlotLayout(ref, item),
+      child: isEmpty
+          ? _buildEmptySlotLayout()
+          : _buildSelectedSlotLayout(ref, item),
     );
   }
 
@@ -285,7 +290,8 @@ class RankingSlotWidget extends ConsumerWidget {
 
               // 이미지 비율에 따른 조건부 크롭핑
               if (imageWidget != null) {
-                return _buildConditionalCroppedImage(imageWidget, pathResult, item);
+                return _buildConditionalCroppedImage(
+                    imageWidget, pathResult, item);
               }
             }
 

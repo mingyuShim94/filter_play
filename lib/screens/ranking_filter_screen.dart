@@ -441,17 +441,6 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Ranking Filter"),
-        actions: [
-          if (cameras.length > 1)
-            IconButton(
-              onPressed: _toggleCamera,
-              icon: const Icon(CupertinoIcons.switch_camera_solid),
-              color: Colors.blueAccent,
-            ),
-        ],
-      ),
       body: _initializeControllerFuture == null
           ? Center(
               child: Column(
@@ -516,64 +505,54 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
                                       "",
                             ),
                           ),
-                        // 랭킹 슬롯 패널 (왼쪽)
-                        const Positioned(
-                          left: 0,
-                          top: 0,
-                          bottom: 0,
-                          child: RankingSlotPanel(),
+                        // 랭킹 슬롯 패널 (왼쪽 아래)
+                        Positioned(
+                          left: 16,
+                          bottom: 100,
+                          child: const RankingSlotPanel(),
                         ),
-                        // 녹화 상태 표시
+                        // 뒤로가기 버튼 오버레이
                         Positioned(
                           top: 0,
                           left: 0,
-                          right: 0,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 8),
-                            color: _isRecording
-                                ? Colors.red.withValues(alpha: 0.1)
-                                : _isProcessing
-                                    ? Colors.orange.withValues(alpha: 0.1)
-                                    : Colors.green.withValues(alpha: 0.1),
-                            child: Row(
-                              children: [
-                                if (_isRecording)
-                                  const Icon(Icons.fiber_manual_record,
-                                      color: Colors.red, size: 16),
-                                if (_isProcessing)
-                                  const SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(
-                                        strokeWidth: 2),
-                                  ),
-                                if (!_isRecording && !_isProcessing)
-                                  const Icon(Icons.check_circle,
-                                      color: Colors.green, size: 16),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    _statusText,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                      shadows: [
-                                        Shadow(
-                                          offset: Offset(1, 1),
-                                          blurRadius: 2,
-                                          color: Colors.black54,
-                                        ),
-                                      ],
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
+                          child: SafeArea(
+                            child: Container(
+                              margin: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.5),
+                                borderRadius: BorderRadius.circular(24),
+                              ),
+                              child: IconButton(
+                                onPressed: () => Navigator.of(context).pop(),
+                                icon: const Icon(Icons.arrow_back),
+                                color: Colors.white,
+                                iconSize: 24,
+                              ),
                             ),
                           ),
                         ),
+                        // 카메라 전환 버튼 오버레이
+                        if (cameras.length > 1)
+                          Positioned(
+                            top: 0,
+                            right: 0,
+                            child: SafeArea(
+                              child: Container(
+                                margin: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withValues(alpha: 0.5),
+                                  borderRadius: BorderRadius.circular(24),
+                                ),
+                                child: IconButton(
+                                  onPressed: _toggleCamera,
+                                  icon: const Icon(
+                                      CupertinoIcons.switch_camera_solid),
+                                  color: Colors.white,
+                                  iconSize: 24,
+                                ),
+                              ),
+                            ),
+                          ),
                       ],
                     ),
                   );
