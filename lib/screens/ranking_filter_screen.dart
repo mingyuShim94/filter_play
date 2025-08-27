@@ -391,7 +391,7 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
     try {
       // flutter_screen_recording으로 녹화 중지 및 파일 경로 받기
       String videoPath = await FlutterScreenRecording.stopRecordScreen;
-      
+
       setState(() {
         _isProcessing = false;
         _statusText = '녹화 완료!';
