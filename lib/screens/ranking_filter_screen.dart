@@ -507,8 +507,8 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
                           ),
                         // 랭킹 슬롯 패널 (왼쪽 아래)
                         Positioned(
-                          left: 16,
-                          bottom: 100,
+                          left: 0,
+                          bottom: 80,
                           child: const RankingSlotPanel(),
                         ),
                         // 뒤로가기 버튼 오버레이 (녹화 중이 아닐 때만 표시)

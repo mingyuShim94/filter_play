@@ -100,7 +100,7 @@ class RankingSlotWidget extends ConsumerWidget {
   // 빈 슬롯 레이아웃 - 우측 정렬하여 선택된 슬롯과 이미지 위치 맞춤
   Widget _buildEmptySlotLayout() {
     return SizedBox(
-      width: 97, // 36(숫자) + 7(간격) + 54(이미지)와 동일 (10% 축소)
+      width: 89, // 28(숫자) + 7(간격) + 54(이미지)와 동일
       height: 54,
       child: Align(
         alignment: Alignment.centerRight,
@@ -152,7 +152,7 @@ class RankingSlotWidget extends ConsumerWidget {
       children: [
         // 랭킹 숫자 표시 영역
         Container(
-          width: 36,
+          width: 28,
           height: 54,
           decoration: BoxDecoration(
             color: rankColor,
@@ -184,6 +184,7 @@ class RankingSlotWidget extends ConsumerWidget {
         const SizedBox(width: 7),
 
         // 이미지 슬롯 영역
+
         AnimatedContainer(
           duration: const Duration(milliseconds: 300),
           width: 54,
