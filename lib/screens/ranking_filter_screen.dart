@@ -511,28 +511,29 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
                           bottom: 100,
                           child: const RankingSlotPanel(),
                         ),
-                        // 뒤로가기 버튼 오버레이
-                        Positioned(
-                          top: 0,
-                          left: 0,
-                          child: SafeArea(
-                            child: Container(
-                              margin: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: Colors.black.withValues(alpha: 0.5),
-                                borderRadius: BorderRadius.circular(24),
-                              ),
-                              child: IconButton(
-                                onPressed: () => Navigator.of(context).pop(),
-                                icon: const Icon(Icons.arrow_back),
-                                color: Colors.white,
-                                iconSize: 24,
+                        // 뒤로가기 버튼 오버레이 (녹화 중이 아닐 때만 표시)
+                        if (!_isRecording)
+                          Positioned(
+                            top: 0,
+                            left: 0,
+                            child: SafeArea(
+                              child: Container(
+                                margin: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withValues(alpha: 0.5),
+                                  borderRadius: BorderRadius.circular(24),
+                                ),
+                                child: IconButton(
+                                  onPressed: () => Navigator.of(context).pop(),
+                                  icon: const Icon(Icons.arrow_back),
+                                  color: Colors.white,
+                                  iconSize: 24,
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                        // 카메라 전환 버튼 오버레이
-                        if (cameras.length > 1)
+                        // 카메라 전환 버튼 오버레이 (녹화 중이 아닐 때만 표시)
+                        if (cameras.length > 1 && !_isRecording)
                           Positioned(
                             top: 0,
                             right: 0,
