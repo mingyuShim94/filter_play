@@ -11,6 +11,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_screen_recording/flutter_screen_recording.dart';
+import 'package:video_player/video_player.dart';
 import '../services/forehead_rectangle_service.dart';
 import '../providers/ranking_game_provider.dart';
 import '../providers/filter_provider.dart';
@@ -71,6 +72,10 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
 
   // 크롭 영역 시각화 관련
   bool _showCropArea = false;
+
+  // 비디오 처리 재시도 관련
+  int _processingRetryCount = 0;
+  static const int _maxProcessingRetries = 3;
 
   @override
   void initState() {
@@ -388,6 +393,330 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
     return '${minutes.toString().padLeft(2, '0')}:${remainingSeconds.toString().padLeft(2, '0')}';
   }
 
+  // 비디오 처리를 재시도하는 메서드
+  Future<void> _processVideoWithRetry(String originalVideoPath) async {
+    for (int attempt = 1; attempt <= _maxProcessingRetries; attempt++) {
+      _processingRetryCount = attempt;
+      
+      try {
+        setState(() {
+          if (attempt == 1) {
+            _statusText = '🎬 고화질 영상 처리 중... (30-60초 소요)';
+          } else {
+            _statusText = '🔄 영상 처리 재시도 중... ($attempt/$_maxProcessingRetries)';
+          }
+        });
+
+        // 카메라 프리뷰 영역 크롭 처리 수행
+        final processingResult =
+            await VideoProcessingService.cropVideoToCameraPreview(
+          inputPath: originalVideoPath,
+          screenWidth: _screenWidth,
+          screenHeight: _screenHeight,
+          cameraWidth: _cameraWidth,
+          cameraHeight: _cameraHeight,
+          leftOffset: _leftOffset,
+          topOffset: _topOffset,
+          progressCallback: (progress) {
+            if (mounted) {
+              final progressPercent = (progress * 100).toInt();
+              String statusMessage;
+              
+              if (progressPercent < 30) {
+                statusMessage = attempt == 1 
+                    ? '🎬 영상 분석 중... $progressPercent%'
+                    : '🔄 영상 분석 재시도... $progressPercent% ($attempt/$_maxProcessingRetries)';
+              } else if (progressPercent < 80) {
+                statusMessage = attempt == 1
+                    ? '✂️ 카메라 영역 추출 중... $progressPercent%'
+                    : '🔄 영역 추출 재시도... $progressPercent% ($attempt/$_maxProcessingRetries)';
+              } else {
+                statusMessage = attempt == 1
+                    ? '🔧 최종 처리 중... $progressPercent%'
+                    : '🔄 최종 처리 재시도... $progressPercent% ($attempt/$_maxProcessingRetries)';
+              }
+              
+              setState(() {
+                _statusText = statusMessage;
+              });
+            }
+          },
+        );
+
+        // 처리 성공 시
+        if (processingResult.success) {
+          await _handleProcessingSuccess(processingResult, originalVideoPath);
+          return; // 성공 시 재시도 루프 종료
+        } else {
+          // 처리 실패 시
+          if (attempt < _maxProcessingRetries) {
+            // 재시도 전 대기
+            setState(() {
+              _statusText = '⏳ 잠시 후 자동 재시도... (${attempt + 1}/$_maxProcessingRetries)';
+            });
+            await Future.delayed(Duration(seconds: 2 + attempt)); // 점진적으로 대기 시간 증가
+            continue; // 다음 시도로 진행
+          } else {
+            // 최대 재시도 횟수 초과
+            await _handleProcessingFailure(processingResult, originalVideoPath);
+            return;
+          }
+        }
+      } catch (e) {
+        print('❌ 비디오 처리 시도 $attempt 실패: $e');
+        if (attempt < _maxProcessingRetries) {
+          setState(() {
+            _statusText = '❌ 처리 오류 발생, 자동 재시도 중... (${attempt + 1}/$_maxProcessingRetries)';
+          });
+          await Future.delayed(Duration(seconds: 3 + attempt));
+          continue;
+        } else {
+          // 최대 재시도 횟수 초과하여 예외 발생
+          await _handleProcessingException(e, originalVideoPath);
+          return;
+        }
+      }
+    }
+  }
+
+  // 처리 성공 시 처리 로직
+  Future<void> _handleProcessingSuccess(VideoProcessingResult processingResult, String originalVideoPath) async {
+    setState(() {
+      _statusText = '✅ 고화질 영상 처리 완료!';
+    });
+
+    // VideoPlayer 준비 상태 검증
+    final videoReady = await _validateVideoReady(processingResult.outputPath!);
+
+    if (videoReady) {
+      setState(() {
+        _statusText = '🎉 영상 준비 완료!';
+      });
+
+      // 성공 메시지 표시
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_processingRetryCount > 1 
+                ? '고화질 영상이 준비되었습니다 (재시도 성공)'
+                : '고화질 영상이 준비되었습니다'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+
+      // 잠시 대기 후 결과 화면으로 이동
+      await Future.delayed(const Duration(milliseconds: 300));
+
+      if (mounted) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (context) => ResultScreen(
+              score: 0,
+              totalBalloons: 0,
+              videoPath: processingResult.outputPath,
+              isOriginalVideo: false,
+              originalVideoPath: originalVideoPath,
+            ),
+          ),
+        );
+      }
+    } else {
+      // VideoPlayer 검증 실패
+      await _handleVideoValidationFailure(processingResult, originalVideoPath);
+    }
+  }
+
+  // 처리 실패 시 처리 로직
+  Future<void> _handleProcessingFailure(VideoProcessingResult processingResult, String originalVideoPath) async {
+    setState(() {
+      _statusText = '❌ 영상 처리 최종 실패 ($_maxProcessingRetries회 시도)';
+    });
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('영상 처리에 $_maxProcessingRetries회 실패했습니다. 에러 정보를 확인해주세요.'),
+          duration: Duration(seconds: 3),
+        ),
+      );
+
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (context) => ResultScreen(
+            score: 0,
+            totalBalloons: 0,
+            videoPath: null,
+            processingError: processingResult.error,
+            originalVideoPath: originalVideoPath,
+          ),
+        ),
+      );
+    }
+  }
+
+  // VideoPlayer 검증 실패 시 처리 로직
+  Future<void> _handleVideoValidationFailure(VideoProcessingResult processingResult, String originalVideoPath) async {
+    setState(() {
+      _statusText = '❌ 영상 준비 검증 실패';
+    });
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('영상 준비에 실패했습니다.'),
+          duration: Duration(seconds: 3),
+        ),
+      );
+
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (context) => ResultScreen(
+            score: 0,
+            totalBalloons: 0,
+            videoPath: null,
+            processingError: VideoProcessingError(
+              message: '영상 준비 검증 실패: VideoPlayer 호환성 문제',
+              inputPath: originalVideoPath,
+              outputPath: processingResult.outputPath,
+              ffmpegCommand: 'N/A',
+              logs: ['영상 파일은 생성되었으나 VideoPlayer에서 재생할 수 없는 상태'],
+              fileInfo: {},
+              timestamp: DateTime.now(),
+            ),
+            originalVideoPath: originalVideoPath,
+          ),
+        ),
+      );
+    }
+  }
+
+  // 예외 발생 시 처리 로직
+  Future<void> _handleProcessingException(dynamic error, String originalVideoPath) async {
+    setState(() {
+      _statusText = '❌ 영상 처리 중 오류 발생';
+    });
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('영상 처리 중 오류가 발생했습니다: $error'),
+          duration: Duration(seconds: 3),
+        ),
+      );
+
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (context) => ResultScreen(
+            score: 0,
+            totalBalloons: 0,
+            videoPath: null,
+            processingError: VideoProcessingError(
+              message: '영상 처리 중 예외 발생: $error',
+              inputPath: originalVideoPath,
+              outputPath: null,
+              ffmpegCommand: 'N/A',
+              logs: ['예외 발생으로 처리 중단'],
+              fileInfo: {},
+              timestamp: DateTime.now(),
+            ),
+            originalVideoPath: originalVideoPath,
+          ),
+        ),
+      );
+    }
+  }
+
+  // 비디오 파일이 VideoPlayer에서 재생 가능한 상태인지 검증
+  Future<bool> _validateVideoReady(String videoPath) async {
+    try {
+      setState(() {
+        _statusText = '🎬 영상 준비 완료 확인 중...';
+      });
+
+      // 파일 존재 및 크기 확인
+      final videoFile = File(videoPath);
+      bool fileExists = false;
+      int fileSize = 0;
+
+      // 파일 존재 및 크기 확인 (최대 10초 대기)
+      for (int attempt = 1; attempt <= 20; attempt++) {
+        setState(() {
+          _statusText = '📁 영상 파일 안정화 대기 중... (${(attempt * 0.5).toInt()}초/10초)';
+        });
+        
+        if (await videoFile.exists()) {
+          fileSize = await videoFile.length();
+          if (fileSize > 1000) { // 1KB 이상이어야 유효한 비디오 파일
+            fileExists = true;
+            break;
+          }
+        }
+        
+        if (attempt < 20) {
+          await Future.delayed(Duration(milliseconds: 500));
+        }
+      }
+
+      if (!fileExists || fileSize < 1000) {
+        print('❌ 비디오 파일 검증 실패: 존재=$fileExists, 크기=${fileSize}B');
+        return false;
+      }
+
+      setState(() {
+        _statusText = '🔧 비디오 플레이어 호환성 확인 중...';
+      });
+
+      // VideoPlayerController로 실제 초기화 테스트 (재시도 로직 포함)
+      VideoPlayerController? testController;
+      bool canInitialize = false;
+      
+      // VideoPlayer 초기화를 최대 5회까지 재시도
+      for (int testAttempt = 1; testAttempt <= 5; testAttempt++) {
+        try {
+          setState(() {
+            _statusText = testAttempt == 1 
+                ? '🔧 비디오 플레이어 호환성 확인 중...'
+                : '🔄 비디오 플레이어 재확인 중... ($testAttempt/5)';
+          });
+          
+          // 이전 테스트 컨트롤러가 있으면 정리
+          testController?.dispose();
+          
+          testController = VideoPlayerController.file(videoFile);
+          await testController.initialize();
+          
+          if (testController.value.isInitialized) {
+            canInitialize = true;
+            print('✅ VideoPlayer 초기화 테스트 성공 (시도: $testAttempt/5)');
+            break; // 성공하면 재시도 루프 종료
+          }
+        } catch (e) {
+          print('❌ VideoPlayer 초기화 테스트 실패 (시도: $testAttempt/5): $e');
+          
+          if (testAttempt < 5) {
+            // 재시도 전 대기 시간 (점진적으로 증가)
+            final waitTime = Duration(seconds: 1 + testAttempt);
+            await Future.delayed(waitTime);
+            continue; // 다음 시도로 진행
+          }
+        } finally {
+          // 마지막 시도가 아니면 컨트롤러는 다음 루프에서 정리됨
+          if (testAttempt == 5 || canInitialize) {
+            testController?.dispose();
+          }
+        }
+      }
+
+      return canInitialize;
+    } catch (e) {
+      print('❌ 비디오 검증 중 오류: $e');
+      return false;
+    }
+  }
+
   // 녹화 시작 (flutter_screen_recording 사용)
   Future<void> _startRecording() async {
     // 권한 확인
@@ -449,96 +778,16 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
       String originalVideoPath = await FlutterScreenRecording.stopRecordScreen;
 
       if (mounted && originalVideoPath.isNotEmpty) {
-        // 카메라 프리뷰 영역 추출 시작
-        setState(() {
-          _statusText = '카메라 영역 추출 중...';
-        });
-
-        // 카메라 프리뷰 영역 크롭 처리 수행
-        final processingResult =
-            await VideoProcessingService.cropVideoToCameraPreview(
-          inputPath: originalVideoPath,
-          screenWidth: _screenWidth,
-          screenHeight: _screenHeight,
-          cameraWidth: _cameraWidth,
-          cameraHeight: _cameraHeight,
-          leftOffset: _leftOffset,
-          topOffset: _topOffset,
-          progressCallback: (progress) {
-            if (mounted) {
-              setState(() {
-                _statusText = '카메라 영역 추출 중... ${(progress * 100).toInt()}%';
-              });
-            }
-          },
-        );
-
+        // 재시도 카운터 초기화
+        _processingRetryCount = 0;
+        
+        // 재시도 로직이 포함된 비디오 처리 시작
+        await _processVideoWithRetry(originalVideoPath);
+        
+        // 처리 완료 후 상태 업데이트
         setState(() {
           _isProcessing = false;
         });
-
-        if (mounted) {
-          if (processingResult.success) {
-            // 카메라 영역 추출 성공
-            setState(() {
-              _statusText = '카메라 영역 추출 완료!';
-            });
-
-            // 성공 메시지 표시
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('카메라 영역이 추출되었습니다'),
-                duration: Duration(seconds: 2),
-              ),
-            );
-
-            // 잠시 대기 후 결과 화면으로 이동
-            await Future.delayed(const Duration(milliseconds: 500));
-
-            if (mounted) {
-              Navigator.of(context).pushReplacement(
-                MaterialPageRoute(
-                  builder: (context) => ResultScreen(
-                    score: 0, // 임시 점수
-                    totalBalloons: 0, // 임시 값
-                    videoPath: processingResult.outputPath,
-                    isOriginalVideo: false, // 카메라 영역 추출된 영상임을 표시
-                    originalVideoPath: originalVideoPath, // 원본 영상 경로 전달
-                  ),
-                ),
-              );
-            }
-          } else {
-            // 카메라 영역 추출 실패 - 에러 정보를 ResultScreen에 전달
-            setState(() {
-              _statusText = '카메라 영역 추출 실패';
-            });
-
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('카메라 영역 추출에 실패했습니다. 에러 정보를 확인해주세요.'),
-                duration: Duration(seconds: 3),
-              ),
-            );
-
-            // 잠시 대기 후 에러 정보와 함께 결과 화면으로 이동
-            await Future.delayed(const Duration(milliseconds: 500));
-
-            if (mounted) {
-              Navigator.of(context).pushReplacement(
-                MaterialPageRoute(
-                  builder: (context) => ResultScreen(
-                    score: 0, // 임시 점수
-                    totalBalloons: 0, // 임시 값
-                    videoPath: null, // 카메라 영역 추출 실패로 비디오 없음
-                    processingError: processingResult.error, // 에러 정보 전달
-                    originalVideoPath: originalVideoPath, // 원본 영상 경로 전달
-                  ),
-                ),
-              );
-            }
-          }
-        }
       } else {
         setState(() {
           _isProcessing = false;
@@ -712,6 +961,59 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
                               ),
                             ),
                           ),
+
+                        // 처리 상태 표시 (처리 중일 때만)
+                        if (_isProcessing)
+                          Positioned(
+                            bottom: 120,
+                            left: 0,
+                            right: 0,
+                            child: Center(
+                              child: Container(
+                                margin: const EdgeInsets.symmetric(horizontal: 20),
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withValues(alpha: 0.9),
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: Colors.purple.withValues(alpha: 0.5),
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const SizedBox(
+                                      width: 40,
+                                      height: 40,
+                                      child: CircularProgressIndicator(
+                                        color: Colors.purple,
+                                        strokeWidth: 3,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 12),
+                                    Text(
+                                      _statusText,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                    const SizedBox(height: 8),
+                                    const Text(
+                                      '잠시만 기다려주세요',
+                                      style: TextStyle(
+                                        color: Colors.white70,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
                         // 중앙 하단 녹화 버튼
                         Positioned(
                           bottom: 50,
@@ -764,8 +1066,8 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
                             ),
                           ),
                         ),
-                        // 뒤로가기 버튼 오버레이 (녹화 중이 아닐 때만 표시)
-                        if (!_isRecording)
+                        // 뒤로가기 버튼 오버레이 (녹화 중이거나 처리 중이 아닐 때만 표시)
+                        if (!_isRecording && !_isProcessing)
                           Positioned(
                             top: 0,
                             left: 0,
@@ -785,8 +1087,8 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
                               ),
                             ),
                           ),
-                        // 카메라 전환 버튼 오버레이 (녹화 중이 아닐 때만 표시)
-                        if (cameras.length > 1 && !_isRecording)
+                        // 카메라 전환 버튼 오버레이 (녹화 중이거나 처리 중이 아닐 때만 표시)
+                        if (cameras.length > 1 && !_isRecording && !_isProcessing)
                           Positioned(
                             top: 0,
                             right: 0,
@@ -808,8 +1110,8 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
                             ),
                           ),
                         
-                        // 크롭 영역 토글 버튼 (녹화 중이 아닐 때만 표시)
-                        if (!_isRecording)
+                        // 크롭 영역 토글 버튼 (녹화 중이거나 처리 중이 아닐 때만 표시)
+                        if (!_isRecording && !_isProcessing)
                           Positioned(
                             top: 0,
                             right: cameras.length > 1 ? 72 : 16,

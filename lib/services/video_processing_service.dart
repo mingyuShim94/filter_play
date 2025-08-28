@@ -404,6 +404,7 @@ class VideoProcessingService {
       final command = '''
         -i "$inputPath" 
         -vf "crop=$cropWidth:$cropHeight:$cropX:$cropY" 
+        -c:v libx264 -crf 15 -preset medium -r 46 -pix_fmt yuv420p
         -c:a copy "$outputPath"
       '''
           .replaceAll('\n', '')
@@ -426,7 +427,8 @@ class VideoProcessingService {
       logs.add('📁 출력 파일: $outputPath');
       logs.add('🎯 크롭 방식: Flutter 카메라 프리뷰 영역 정확 매칭');
       logs.add('📐 크롭 계산: 화면 좌표 → 비디오 해상도 비율 변환');
-      logs.add('🎬 화질 설정: 원본 유지 (오디오 복사)');
+      logs.add('🎬 화질 설정: H.264 CRF 15 (고화질), 46fps 유지, yuv420p');
+      logs.add('🔊 오디오 설정: AAC 원본 복사 (재압축 없음)');
 
       // FFmpeg 실행
       final session = await FFmpegKit.executeAsync(
@@ -485,8 +487,8 @@ class VideoProcessingService {
       if (isSuccess) {
         // 파일 존재 확인 (재시도 로직 포함)
         bool fileExists = false;
-        for (int attempt = 1; attempt <= 3; attempt++) {
-          logs.add('출력 파일 존재 확인 (시도 $attempt/3)...');
+        for (int attempt = 1; attempt <= 5; attempt++) {
+          logs.add('출력 파일 존재 확인 (시도 $attempt/5)...');
           final outputFile = File(outputPath);
           fileExists = await outputFile.exists();
 
@@ -494,9 +496,9 @@ class VideoProcessingService {
             logs.add('✅ 출력 파일 발견됨');
             break;
           } else {
-            logs.add('❌ 출력 파일 없음 - 200ms 후 재시도');
-            if (attempt < 3) {
-              await Future.delayed(Duration(milliseconds: 200));
+            logs.add('❌ 출력 파일 없음 - 500ms 후 재시도');
+            if (attempt < 5) {
+              await Future.delayed(Duration(milliseconds: 500));
             }
           }
         }
@@ -504,6 +506,10 @@ class VideoProcessingService {
         if (fileExists) {
           final outputFileInfo = await _getFileInfo(outputPath);
           logs.add('출력 파일 생성 성공: ${outputFileInfo['크기']}');
+
+          // 파일 시스템 안정성을 위한 추가 대기
+          logs.add('파일 시스템 안정화 대기 (1초)...');
+          await Future.delayed(Duration(seconds: 1));
 
           progressCallback?.call(1.0); // 완료
           return VideoProcessingResult(

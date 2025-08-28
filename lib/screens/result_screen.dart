@@ -296,7 +296,6 @@ class _VideoPreviewWidgetState extends State<VideoPreviewWidget> {
         });
       }
     } catch (e) {
-      // VideoPreviewWidget 동영상 초기화 오류 처리 (로깅 생략)
       if (mounted) {
         setState(() {
           _hasError = true;
@@ -612,14 +611,23 @@ ${widget.processingError!.toDetailedString()}
           children: [
             CircularProgressIndicator(
               color: Colors.white,
-              strokeWidth: 2,
+              strokeWidth: 3,
+            ),
+            SizedBox(height: 16),
+            Text(
+              '🎬 동영상 로딩 중...',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+              ),
             ),
             SizedBox(height: 8),
             Text(
-              '동영상 로딩 중...',
+              '잠시만 기다려주세요',
               style: TextStyle(
-                color: Colors.white,
-                fontSize: 14,
+                color: Colors.white70,
+                fontSize: 12,
               ),
             ),
           ],
