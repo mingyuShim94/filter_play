@@ -60,8 +60,8 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
   void initState() {
     super.initState();
 
-    // 전체화면 모드 설정 (상태바와 내비게이션 바 숨김)
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersive);
+    // 기본 시스템 UI 모드 유지 (상태바와 내비게이션 바 표시)
+    // SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersive); // 주석 처리
 
     _requestPermissionsAndInitialize();
 
@@ -486,131 +486,182 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
                 if (snapshot.connectionState == ConnectionState.done &&
                     _controller != null &&
                     _controller!.value.isInitialized) {
-                  return Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      CameraPreview(_controller!),
-                      // 이마 이미지 오버레이 (얼굴이 감지되고 이마 사각형이 있을 때만)
-                      if (_currentForeheadRectangle != null &&
-                          _currentForeheadRectangle!.isValid)
-                        CustomPaint(
-                          painter: ForeheadImagePainter(
-                            foreheadRectangle: _currentForeheadRectangle!,
-                            imageSize: Size(
-                              _controller!.value.previewSize!.height,
-                              _controller!.value.previewSize!.width,
-                            ),
-                            screenSize: Size(
-                              MediaQuery.of(context).size.width,
-                              MediaQuery.of(context).size.height,
-                            ),
-                            currentItemName:
-                                ref.watch(currentRankingItemProvider)?.name ??
-                                    "",
-                          ),
-                        ),
-                      // 랭킹 슬롯 패널 (왼쪽 아래)
-                      Positioned(
-                        left: 0,
-                        bottom: 80,
-                        child: const RankingSlotPanel(),
-                      ),
-                      // 중앙 하단 녹화 버튼
-                      Positioned(
-                        bottom: 50,
-                        left: 0,
-                        right: 0,
-                        child: Center(
-                          child: GestureDetector(
-                            onTap: _isProcessing
-                                ? null
-                                : _isRecording
-                                    ? _stopRecording
-                                    : _startRecording,
-                            child: Container(
-                              width: 80,
-                              height: 80,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: _isRecording
-                                    ? Colors.red
-                                    : _isProcessing
-                                        ? Colors.grey
-                                        : Colors.white,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.3),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 4),
-                                  ),
-                                ],
-                                border: Border.all(
-                                  color: Colors.black.withValues(alpha: 0.2),
-                                  width: 2,
+                  return LayoutBuilder(builder: (context, constraints) {
+                    // 화면 크기 가져오기
+                    final screenWidth = constraints.maxWidth;
+                    final screenHeight = constraints.maxHeight;
+
+                    // 9:16 비율 계산
+                    final aspectRatio = 9.0 / 16.0;
+
+                    // 너비 기준으로 9:16 비율 높이 계산
+                    double cameraWidth = screenWidth;
+                    double cameraHeight = screenWidth / aspectRatio;
+
+                    // 화면 높이를 초과하면 높이 기준으로 재계산 (녹화버튼 공간 150px 제외)
+                    if (cameraHeight > screenHeight - 150) {
+                      cameraHeight = screenHeight - 150;
+                      cameraWidth = cameraHeight * aspectRatio;
+                    }
+
+                    // 카메라 영역 중앙 배치를 위한 오프셋
+                    final leftOffset = (screenWidth - cameraWidth) / 2;
+                    final topOffset = (screenHeight - 150 - cameraHeight) / 2;
+
+                    return Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        // 9:16 비율 CameraPreview (중앙 배치)
+                        Positioned(
+                          left: leftOffset,
+                          top: topOffset,
+                          width: cameraWidth,
+                          height: cameraHeight,
+                          child: ClipRect(
+                            child: OverflowBox(
+                              alignment: Alignment.center,
+                              child: FittedBox(
+                                fit: BoxFit.cover,
+                                child: SizedBox(
+                                  width: cameraWidth,
+                                  height: cameraHeight,
+                                  child: CameraPreview(_controller!),
                                 ),
                               ),
-                              child: Icon(
-                                _isRecording
-                                    ? Icons.stop
-                                    : _isProcessing
-                                        ? Icons.hourglass_empty
-                                        : Icons.videocam,
-                                size: 36,
-                                color: _isRecording
-                                    ? Colors.white
-                                    : _isProcessing
-                                        ? Colors.white
-                                        : Colors.red,
-                              ),
                             ),
                           ),
                         ),
-                      ),
-                      // 뒤로가기 버튼 오버레이 (녹화 중이 아닐 때만 표시)
-                      if (!_isRecording)
+                        // 이마 이미지 오버레이 (얼굴이 감지되고 이마 사각형이 있을 때만)
+                        if (_currentForeheadRectangle != null &&
+                            _currentForeheadRectangle!.isValid)
+                          Positioned(
+                            left: leftOffset,
+                            top: topOffset,
+                            width: cameraWidth,
+                            height: cameraHeight,
+                            child: CustomPaint(
+                              painter: ForeheadImagePainter(
+                                foreheadRectangle: _currentForeheadRectangle!,
+                                imageSize: Size(
+                                  _controller!.value.previewSize!.height,
+                                  _controller!.value.previewSize!.width,
+                                ),
+                                screenSize: Size(
+                                  cameraWidth,
+                                  cameraHeight, // 9:16 비율 영역 크기 사용
+                                ),
+                                currentItemName: ref
+                                        .watch(currentRankingItemProvider)
+                                        ?.name ??
+                                    "",
+                              ),
+                            ),
+                          ),
+                        // 랭킹 슬롯 패널 (9:16 카메라 영역 내 왼쪽 하단에 배치)
                         Positioned(
-                          top: 0,
+                          left: leftOffset,
+                          bottom:
+                              screenHeight - (topOffset + cameraHeight) + 60,
+                          child: const RankingSlotPanel(),
+                        ),
+                        // 중앙 하단 녹화 버튼
+                        Positioned(
+                          bottom: 50,
                           left: 0,
-                          child: SafeArea(
-                            child: Container(
-                              margin: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: Colors.black.withValues(alpha: 0.5),
-                                borderRadius: BorderRadius.circular(24),
-                              ),
-                              child: IconButton(
-                                onPressed: () => Navigator.of(context).pop(),
-                                icon: const Icon(Icons.arrow_back),
-                                color: Colors.white,
-                                iconSize: 24,
-                              ),
-                            ),
-                          ),
-                        ),
-                      // 카메라 전환 버튼 오버레이 (녹화 중이 아닐 때만 표시)
-                      if (cameras.length > 1 && !_isRecording)
-                        Positioned(
-                          top: 0,
                           right: 0,
-                          child: SafeArea(
-                            child: Container(
-                              margin: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: Colors.black.withValues(alpha: 0.5),
-                                borderRadius: BorderRadius.circular(24),
-                              ),
-                              child: IconButton(
-                                onPressed: _toggleCamera,
-                                icon: const Icon(
-                                    CupertinoIcons.switch_camera_solid),
-                                color: Colors.white,
-                                iconSize: 24,
+                          child: Center(
+                            child: GestureDetector(
+                              onTap: _isProcessing
+                                  ? null
+                                  : _isRecording
+                                      ? _stopRecording
+                                      : _startRecording,
+                              child: Container(
+                                width: 80,
+                                height: 80,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: _isRecording
+                                      ? Colors.red
+                                      : _isProcessing
+                                          ? Colors.grey
+                                          : Colors.white,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color:
+                                          Colors.black.withValues(alpha: 0.3),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ],
+                                  border: Border.all(
+                                    color: Colors.black.withValues(alpha: 0.2),
+                                    width: 2,
+                                  ),
+                                ),
+                                child: Icon(
+                                  _isRecording
+                                      ? Icons.stop
+                                      : _isProcessing
+                                          ? Icons.hourglass_empty
+                                          : Icons.videocam,
+                                  size: 36,
+                                  color: _isRecording
+                                      ? Colors.white
+                                      : _isProcessing
+                                          ? Colors.white
+                                          : Colors.red,
+                                ),
                               ),
                             ),
                           ),
                         ),
-                    ],
-                  );
+                        // 뒤로가기 버튼 오버레이 (녹화 중이 아닐 때만 표시)
+                        if (!_isRecording)
+                          Positioned(
+                            top: 0,
+                            left: 0,
+                            child: SafeArea(
+                              child: Container(
+                                margin: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withValues(alpha: 0.5),
+                                  borderRadius: BorderRadius.circular(24),
+                                ),
+                                child: IconButton(
+                                  onPressed: () => Navigator.of(context).pop(),
+                                  icon: const Icon(Icons.arrow_back),
+                                  color: Colors.white,
+                                  iconSize: 24,
+                                ),
+                              ),
+                            ),
+                          ),
+                        // 카메라 전환 버튼 오버레이 (녹화 중이 아닐 때만 표시)
+                        if (cameras.length > 1 && !_isRecording)
+                          Positioned(
+                            top: 0,
+                            right: 0,
+                            child: SafeArea(
+                              child: Container(
+                                margin: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withValues(alpha: 0.5),
+                                  borderRadius: BorderRadius.circular(24),
+                                ),
+                                child: IconButton(
+                                  onPressed: _toggleCamera,
+                                  icon: const Icon(
+                                      CupertinoIcons.switch_camera_solid),
+                                  color: Colors.white,
+                                  iconSize: 24,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    );
+                  });
                 } else if (snapshot.hasError) {
                   return const Center(child: Text('Error'));
                 } else {

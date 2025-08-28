@@ -23,7 +23,7 @@ class RankingSlotPanel extends ConsumerWidget {
     final actualItemCount = itemCount > 0 ? itemCount : 10; // 초기 상태 고려
 
     return SizedBox(
-      width: 120,
+      width: 96, // 120에서 20% 감소 (120 * 0.8 = 96)
       child: Column(
         mainAxisSize: MainAxisSize.min, // 컨텐츠 크기에 맞춤
         mainAxisAlignment: MainAxisAlignment.center,
@@ -100,14 +100,14 @@ class RankingSlotWidget extends ConsumerWidget {
   // 빈 슬롯 레이아웃 - 우측 정렬하여 선택된 슬롯과 이미지 위치 맞춤
   Widget _buildEmptySlotLayout() {
     return SizedBox(
-      width: 89, // 28(숫자) + 7(간격) + 54(이미지)와 동일
-      height: 54,
+      width: 73, // 26(숫자) + 4(간격) + 43(이미지)와 동일 (20% 감소)
+      height: 43, // 54에서 20% 감소 (54 * 0.8 = 43.2 ≈ 43)
       child: Align(
         alignment: Alignment.centerRight,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 300),
-          width: 54,
-          height: 54,
+          width: 43, // 54에서 20% 감소 (54 * 0.8 = 43.2 ≈ 43)
+          height: 43, // 54에서 20% 감소
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [
@@ -115,10 +115,10 @@ class RankingSlotWidget extends ConsumerWidget {
                 Colors.white.withValues(alpha: 0.2),
               ],
             ),
-            borderRadius: BorderRadius.circular(15),
+            borderRadius: BorderRadius.circular(12), // 15에서 20% 감소 (15 * 0.8 = 12)
             border: Border.all(
               color: Colors.white.withValues(alpha: 0.5),
-              width: 1.5,
+              width: 1.2, // 1.5에서 20% 감소 (1.5 * 0.8 = 1.2)
             ),
             boxShadow: [
               BoxShadow(
@@ -133,7 +133,7 @@ class RankingSlotWidget extends ConsumerWidget {
               '$rank',
               style: TextStyle(
                 color: Colors.white.withValues(alpha: 0.9),
-                fontSize: 24,
+                fontSize: 14, // 18에서 20% 감소 (18 * 0.8 = 14.4 ≈ 14)
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -152,14 +152,14 @@ class RankingSlotWidget extends ConsumerWidget {
       children: [
         // 랭킹 숫자 표시 영역
         Container(
-          width: 28,
-          height: 54,
+          width: 26, // 32에서 20% 감소 (32 * 0.8 = 25.6 ≈ 26)
+          height: 43, // 54에서 20% 감소 (54 * 0.8 = 43.2 ≈ 43)
           decoration: BoxDecoration(
             color: rankColor,
-            borderRadius: BorderRadius.circular(15),
+            borderRadius: BorderRadius.circular(12), // 15에서 20% 감소 (15 * 0.8 = 12)
             border: Border.all(
               color: rankColor,
-              width: 2,
+              width: 1.6, // 2에서 20% 감소 (2 * 0.8 = 1.6)
             ),
             boxShadow: [
               BoxShadow(
@@ -174,21 +174,21 @@ class RankingSlotWidget extends ConsumerWidget {
               '$rank',
               style: const TextStyle(
                 color: Colors.white,
-                fontSize: 22,
+                fontSize: 14, // 18에서 20% 감소 (18 * 0.8 = 14.4 ≈ 14)
                 fontWeight: FontWeight.bold,
               ),
             ),
           ),
         ),
 
-        const SizedBox(width: 7),
+        const SizedBox(width: 4), // 5에서 20% 감소 (5 * 0.8 = 4)
 
         // 이미지 슬롯 영역
 
         AnimatedContainer(
           duration: const Duration(milliseconds: 300),
-          width: 54,
-          height: 54,
+          width: 43, // 54에서 20% 감소 (54 * 0.8 = 43.2 ≈ 43)
+          height: 43, // 54에서 20% 감소
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [
@@ -196,16 +196,16 @@ class RankingSlotWidget extends ConsumerWidget {
                 rankColor.withValues(alpha: 0.6),
               ],
             ),
-            borderRadius: BorderRadius.circular(15),
+            borderRadius: BorderRadius.circular(12), // 15에서 20% 감소 (15 * 0.8 = 12)
             border: Border.all(
               color: rankColor,
-              width: 2,
+              width: 1.6, // 2에서 20% 감소 (2 * 0.8 = 1.6)
             ),
             boxShadow: [
               BoxShadow(
                 color: rankColor.withValues(alpha: 0.3),
-                blurRadius: 4,
-                offset: const Offset(0, 2),
+                blurRadius: 3.2, // 4에서 20% 감소 (4 * 0.8 = 3.2)
+                offset: const Offset(0, 1.6), // 2에서 20% 감소 (2 * 0.8 = 1.6)
               ),
             ],
           ),
@@ -218,7 +218,7 @@ class RankingSlotWidget extends ConsumerWidget {
   // 선택된 슬롯 UI - 이미지만 표시 (숫자는 별도 영역에서 처리)
   Widget _buildSelectedSlot(WidgetRef ref, RankingItem item) {
     return ClipRRect(
-      borderRadius: BorderRadius.circular(13), // 컨테이너보다 살짝 작게
+      borderRadius: BorderRadius.circular(10), // 13에서 20% 감소 (13 * 0.8 = 10.4 ≈ 10)
       child: _buildItemImage(ref, item),
     );
   }
@@ -333,10 +333,10 @@ class RankingSlotWidget extends ConsumerWidget {
       color: Colors.white12,
       child: const Center(
         child: SizedBox(
-          width: 20,
-          height: 20,
+          width: 16, // 20에서 20% 감소 (20 * 0.8 = 16)
+          height: 16, // 20에서 20% 감소
           child: CircularProgressIndicator(
-            strokeWidth: 2,
+            strokeWidth: 1.6, // 2에서 20% 감소 (2 * 0.8 = 1.6)
             valueColor: AlwaysStoppedAnimation<Color>(Colors.white54),
           ),
         ),
@@ -350,7 +350,7 @@ class RankingSlotWidget extends ConsumerWidget {
       color: Colors.white24,
       child: const Icon(
         Icons.person,
-        size: 32,
+        size: 26, // 32에서 20% 감소 (32 * 0.8 = 25.6 ≈ 26)
         color: Colors.white60,
       ),
     );
@@ -373,10 +373,10 @@ class RankingSlotWidget extends ConsumerWidget {
             return Stack(
               children: [
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(13),
+                  borderRadius: BorderRadius.circular(10), // 13에서 20% 감소 (13 * 0.8 = 10.4 ≈ 10)
                   child: SizedBox(
-                    width: 54,
-                    height: 54,
+                    width: 43, // 54에서 20% 감소 (54 * 0.8 = 43.2 ≈ 43)
+                    height: 43, // 54에서 20% 감소
                     child: FittedBox(
                       fit: BoxFit.cover,
                       child: imageWidget,
@@ -387,19 +387,19 @@ class RankingSlotWidget extends ConsumerWidget {
                 Positioned(
                   left: 0,
                   right: 0,
-                  bottom: 2,
+                  bottom: 1.6, // 2에서 20% 감소 (2 * 0.8 = 1.6)
                   child: Align(
                     alignment: Alignment.bottomCenter,
                     child: Text(
                       item.name,
                       style: TextStyle(
                         color: Colors.white,
-                        fontSize: 10,
+                        fontSize: 8, // 10에서 20% 감소 (10 * 0.8 = 8)
                         fontWeight: FontWeight.bold,
                         shadows: [
                           Shadow(
-                            offset: Offset(0.5, 0.5),
-                            blurRadius: 1,
+                            offset: Offset(0.4, 0.4), // 0.5에서 20% 감소 (0.5 * 0.8 = 0.4)
+                            blurRadius: 0.8, // 1에서 20% 감소 (1 * 0.8 = 0.8)
                             color: Colors.black,
                           ),
                         ],
@@ -414,10 +414,10 @@ class RankingSlotWidget extends ConsumerWidget {
             return Stack(
               children: [
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(13),
+                  borderRadius: BorderRadius.circular(10), // 13에서 20% 감소 (13 * 0.8 = 10.4 ≈ 10)
                   child: SizedBox(
-                    width: 54,
-                    height: 54,
+                    width: 43, // 54에서 20% 감소 (54 * 0.8 = 43.2 ≈ 43)
+                    height: 43, // 54에서 20% 감소
                     child: FittedBox(
                       fit: BoxFit.cover,
                       child: imageWidget,
@@ -428,19 +428,19 @@ class RankingSlotWidget extends ConsumerWidget {
                 Positioned(
                   left: 0,
                   right: 0,
-                  bottom: 2,
+                  bottom: 1.6, // 2에서 20% 감소 (2 * 0.8 = 1.6)
                   child: Align(
                     alignment: Alignment.bottomCenter,
                     child: Text(
                       item.name,
                       style: TextStyle(
                         color: Colors.white,
-                        fontSize: 10,
+                        fontSize: 8, // 10에서 20% 감소 (10 * 0.8 = 8)
                         fontWeight: FontWeight.bold,
                         shadows: [
                           Shadow(
-                            offset: Offset(0.5, 0.5),
-                            blurRadius: 1,
+                            offset: Offset(0.4, 0.4), // 0.5에서 20% 감소 (0.5 * 0.8 = 0.4)
+                            blurRadius: 0.8, // 1에서 20% 감소 (1 * 0.8 = 0.8)
                             color: Colors.black,
                           ),
                         ],
@@ -480,14 +480,14 @@ class RankingSlotWidget extends ConsumerWidget {
                     Positioned(
                       left: 0,
                       right: 0,
-                      bottom: 2,
+                      bottom: 1.6, // 2에서 20% 감소 (2 * 0.8 = 1.6)
                       child: Align(
                         alignment: Alignment.bottomCenter,
                         child: Text(
                           item.name,
                           style: TextStyle(
                             color: Colors.white,
-                            fontSize: 10,
+                            fontSize: 8, // 10에서 20% 감소 (10 * 0.8 = 8)
                             fontWeight: FontWeight.bold,
                             shadows: [
                               Shadow(
@@ -521,14 +521,14 @@ class RankingSlotWidget extends ConsumerWidget {
                     Positioned(
                       left: 0,
                       right: 0,
-                      bottom: 2,
+                      bottom: 1.6, // 2에서 20% 감소 (2 * 0.8 = 1.6)
                       child: Align(
                         alignment: Alignment.bottomCenter,
                         child: Text(
                           item.name,
                           style: TextStyle(
                             color: Colors.white,
-                            fontSize: 10,
+                            fontSize: 8, // 10에서 20% 감소 (10 * 0.8 = 8)
                             fontWeight: FontWeight.bold,
                             shadows: [
                               Shadow(
@@ -551,10 +551,10 @@ class RankingSlotWidget extends ConsumerWidget {
             return Stack(
               children: [
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(13),
+                  borderRadius: BorderRadius.circular(10), // 13에서 20% 감소 (13 * 0.8 = 10.4 ≈ 10)
                   child: SizedBox(
-                    width: 54,
-                    height: 54,
+                    width: 43, // 54에서 20% 감소 (54 * 0.8 = 43.2 ≈ 43)
+                    height: 43, // 54에서 20% 감소
                     child: FittedBox(
                       fit: BoxFit.cover,
                       child: imageWidget,
@@ -565,19 +565,19 @@ class RankingSlotWidget extends ConsumerWidget {
                 Positioned(
                   left: 0,
                   right: 0,
-                  bottom: 2,
+                  bottom: 1.6, // 2에서 20% 감소 (2 * 0.8 = 1.6)
                   child: Align(
                     alignment: Alignment.bottomCenter,
                     child: Text(
                       item.name,
                       style: TextStyle(
                         color: Colors.white,
-                        fontSize: 10,
+                        fontSize: 8, // 10에서 20% 감소 (10 * 0.8 = 8)
                         fontWeight: FontWeight.bold,
                         shadows: [
                           Shadow(
-                            offset: Offset(0.5, 0.5),
-                            blurRadius: 1,
+                            offset: Offset(0.4, 0.4), // 0.5에서 20% 감소 (0.5 * 0.8 = 0.4)
+                            blurRadius: 0.8, // 1에서 20% 감소 (1 * 0.8 = 0.8)
                             color: Colors.black,
                           ),
                         ],
@@ -596,10 +596,10 @@ class RankingSlotWidget extends ConsumerWidget {
     return Stack(
       children: [
         ClipRRect(
-          borderRadius: BorderRadius.circular(13),
+          borderRadius: BorderRadius.circular(10), // 13에서 20% 감소 (13 * 0.8 = 10.4 ≈ 10)
           child: SizedBox(
-            width: 54,
-            height: 54,
+            width: 43, // 54에서 20% 감소 (54 * 0.8 = 43.2 ≈ 43)
+            height: 43, // 54에서 20% 감소
             child: FittedBox(
               fit: BoxFit.cover,
               child: imageWidget,
@@ -690,7 +690,7 @@ class RankMedalWidget extends StatelessWidget {
   const RankMedalWidget({
     super.key,
     required this.rank,
-    this.size = 24,
+    this.size = 19, // 24에서 20% 감소 (24 * 0.8 = 19.2 ≈ 19)
   });
 
   @override
