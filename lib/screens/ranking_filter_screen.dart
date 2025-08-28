@@ -61,6 +61,17 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
   Timer? _recordingTimer;
   int _recordingSeconds = 0;
 
+  // 카메라 영역 정보 저장
+  double _cameraWidth = 0;
+  double _cameraHeight = 0;
+  double _leftOffset = 0;
+  double _topOffset = 0;
+  double _screenWidth = 0;
+  double _screenHeight = 0;
+
+  // 크롭 영역 시각화 관련
+  bool _showCropArea = false;
+
   @override
   void initState() {
     super.initState();
@@ -447,6 +458,12 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
         final processingResult =
             await VideoProcessingService.cropVideoToCameraPreview(
           inputPath: originalVideoPath,
+          screenWidth: _screenWidth,
+          screenHeight: _screenHeight,
+          cameraWidth: _cameraWidth,
+          cameraHeight: _cameraHeight,
+          leftOffset: _leftOffset,
+          topOffset: _topOffset,
           progressCallback: (progress) {
             if (mounted) {
               setState(() {
@@ -602,6 +619,14 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
                     // 카메라 영역 중앙 배치를 위한 오프셋
                     final leftOffset = (screenWidth - cameraWidth) / 2;
                     final topOffset = (screenHeight - 150 - cameraHeight) / 2;
+
+                    // 카메라 영역 정보 저장 (비디오 처리에서 사용)
+                    _screenWidth = screenWidth;
+                    _screenHeight = screenHeight;
+                    _cameraWidth = cameraWidth;
+                    _cameraHeight = cameraHeight;
+                    _leftOffset = leftOffset;
+                    _topOffset = topOffset;
 
                     return Stack(
                       fit: StackFit.expand,
@@ -777,6 +802,117 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
                                   color: Colors.white,
                                   iconSize: 24,
                                 ),
+                              ),
+                            ),
+                          ),
+                        
+                        // 크롭 영역 토글 버튼 (녹화 중이 아닐 때만 표시)
+                        if (!_isRecording)
+                          Positioned(
+                            top: 0,
+                            right: cameras.length > 1 ? 72 : 16,
+                            child: SafeArea(
+                              child: Container(
+                                margin: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withValues(alpha: 0.5),
+                                  borderRadius: BorderRadius.circular(24),
+                                ),
+                                child: IconButton(
+                                  onPressed: () {
+                                    setState(() {
+                                      _showCropArea = !_showCropArea;
+                                    });
+                                  },
+                                  icon: Icon(
+                                    _showCropArea
+                                        ? Icons.crop_free
+                                        : Icons.crop,
+                                  ),
+                                  color: _showCropArea ? Colors.red : Colors.white,
+                                  iconSize: 24,
+                                ),
+                              ),
+                            ),
+                          ),
+
+                        // 크롭 영역 시각화 (빨간 사각형)
+                        if (_showCropArea)
+                          Positioned(
+                            left: leftOffset,
+                            top: topOffset,
+                            width: cameraWidth,
+                            height: cameraHeight,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                border: Border.all(
+                                  color: Colors.red,
+                                  width: 3.0,
+                                ),
+                              ),
+                              child: Container(
+                                color: Colors.red.withValues(alpha: 0.1),
+                              ),
+                            ),
+                          ),
+
+                        // 디버그 정보 표시 (크롭 영역 표시 중일 때만)
+                        if (_showCropArea)
+                          Positioned(
+                            left: 16,
+                            bottom: 180,
+                            child: Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.8),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '🎯 크롭 영역 정보',
+                                    style: TextStyle(
+                                      color: Colors.red,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    '화면 크기: ${screenWidth.toInt()}×${screenHeight.toInt()}',
+                                    style: TextStyle(color: Colors.white, fontSize: 12),
+                                  ),
+                                  Text(
+                                    '카메라 영역: ${cameraWidth.toInt()}×${cameraHeight.toInt()}',
+                                    style: TextStyle(color: Colors.white, fontSize: 12),
+                                  ),
+                                  Text(
+                                    '오프셋: (${leftOffset.toInt()}, ${topOffset.toInt()})',
+                                    style: TextStyle(color: Colors.white, fontSize: 12),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '크롭 비율:',
+                                    style: TextStyle(color: Colors.yellow, fontSize: 12),
+                                  ),
+                                  Text(
+                                    '  Width: ${(cameraWidth / screenWidth * 100).toStringAsFixed(1)}%',
+                                    style: TextStyle(color: Colors.white, fontSize: 11),
+                                  ),
+                                  Text(
+                                    '  Height: ${(cameraHeight / screenHeight * 100).toStringAsFixed(1)}%',
+                                    style: TextStyle(color: Colors.white, fontSize: 11),
+                                  ),
+                                  Text(
+                                    '  X: ${(leftOffset / screenWidth * 100).toStringAsFixed(1)}%',
+                                    style: TextStyle(color: Colors.white, fontSize: 11),
+                                  ),
+                                  Text(
+                                    '  Y: ${(topOffset / screenHeight * 100).toStringAsFixed(1)}%',
+                                    style: TextStyle(color: Colors.white, fontSize: 11),
+                                  ),
+                                ],
                               ),
                             ),
                           ),
