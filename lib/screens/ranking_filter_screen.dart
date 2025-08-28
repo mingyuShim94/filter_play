@@ -16,6 +16,7 @@ import '../providers/ranking_game_provider.dart';
 import '../providers/filter_provider.dart';
 import '../providers/image_path_provider.dart';
 import '../services/ranking_data_service.dart';
+import '../services/video_processing_service.dart';
 import '../widgets/ranking_slot_panel.dart';
 import 'result_screen.dart';
 
@@ -434,38 +435,94 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
 
     try {
       // flutter_screen_recording으로 녹화 중지 및 파일 경로 받기
-      String videoPath = await FlutterScreenRecording.stopRecordScreen;
+      String originalVideoPath = await FlutterScreenRecording.stopRecordScreen;
 
-      setState(() {
-        _isProcessing = false;
-        _statusText = '녹화 완료!';
-      });
+      if (mounted && originalVideoPath.isNotEmpty) {
+        // 카메라 프리뷰 영역 추출 시작
+        setState(() {
+          _statusText = '카메라 영역 추출 중...';
+        });
 
-      if (mounted && videoPath.isNotEmpty) {
-        // 성공 메시지 표시
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('동영상이 저장되었습니다'),
-            duration: Duration(seconds: 2),
-          ),
+        // 카메라 프리뷰 영역 크롭 처리 수행
+        final processingResult =
+            await VideoProcessingService.cropVideoToCameraPreview(
+          inputPath: originalVideoPath,
+          progressCallback: (progress) {
+            if (mounted) {
+              setState(() {
+                _statusText = '카메라 영역 추출 중... ${(progress * 100).toInt()}%';
+              });
+            }
+          },
         );
 
-        // 잠시 대기 후 결과 화면으로 이동
-        await Future.delayed(const Duration(milliseconds: 500));
+        setState(() {
+          _isProcessing = false;
+        });
 
         if (mounted) {
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(
-              builder: (context) => ResultScreen(
-                score: 0, // 임시 점수
-                totalBalloons: 0, // 임시 값
-                videoPath: videoPath,
+          if (processingResult.success) {
+            // 카메라 영역 추출 성공
+            setState(() {
+              _statusText = '카메라 영역 추출 완료!';
+            });
+
+            // 성공 메시지 표시
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('카메라 영역이 추출되었습니다'),
+                duration: Duration(seconds: 2),
               ),
-            ),
-          );
+            );
+
+            // 잠시 대기 후 결과 화면으로 이동
+            await Future.delayed(const Duration(milliseconds: 500));
+
+            if (mounted) {
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(
+                  builder: (context) => ResultScreen(
+                    score: 0, // 임시 점수
+                    totalBalloons: 0, // 임시 값
+                    videoPath: processingResult.outputPath,
+                    isOriginalVideo: false, // 카메라 영역 추출된 영상임을 표시
+                  ),
+                ),
+              );
+            }
+          } else {
+            // 카메라 영역 추출 실패 - 에러 정보를 ResultScreen에 전달
+            setState(() {
+              _statusText = '카메라 영역 추출 실패';
+            });
+
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('카메라 영역 추출에 실패했습니다. 에러 정보를 확인해주세요.'),
+                duration: Duration(seconds: 3),
+              ),
+            );
+
+            // 잠시 대기 후 에러 정보와 함께 결과 화면으로 이동
+            await Future.delayed(const Duration(milliseconds: 500));
+
+            if (mounted) {
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(
+                  builder: (context) => ResultScreen(
+                    score: 0, // 임시 점수
+                    totalBalloons: 0, // 임시 값
+                    videoPath: null, // 카메라 영역 추출 실패로 비디오 없음
+                    processingError: processingResult.error, // 에러 정보 전달
+                  ),
+                ),
+              );
+            }
+          }
         }
       } else {
         setState(() {
+          _isProcessing = false;
           _statusText = '녹화된 동영상을 찾을 수 없습니다';
         });
       }
@@ -742,10 +799,12 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
 }
 
 /// 이마 영역에 이미지를 표시하는 전용 CustomPainter
+
 class ForeheadImagePainter extends CustomPainter {
   final ForeheadRectangle foreheadRectangle;
   final Size imageSize;
   final Size screenSize;
+
   final String currentItemName;
 
   ForeheadImagePainter({

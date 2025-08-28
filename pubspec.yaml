@@ -49,6 +49,7 @@ dependencies:
   record: ^6.0.0
   ffmpeg_kit_flutter_new: ^3.2.0
   path_provider: ^2.1.5
+  path: ^1.9.0
   flutter_screen_recording: ^2.0.24
 
   # HTTP & Storage
