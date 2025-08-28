@@ -365,11 +365,28 @@ class VideoProcessingService {
       // RankingFilterScreen에서 카메라는 9:16 비율로 화면 중앙에 배치되고, 
       // 하단 150px는 녹화버튼 영역으로 제외됨
       
-      // 카메라 프리뷰 영역 크롭 (단순 버전 - 이전 성공 버전)
-      // 중앙에서 50% 크기로 크롭하는 단순한 방식으로 복원
-      // crop=width:height:x:y 형식
-      // iw*0.5:ih*0.5:(iw-iw*0.5)/2:(ih-ih*0.5)/2
-      final command = '-i "$inputPath" -vf "crop=iw*0.5:ih*0.5:(iw-iw*0.5)/2:(ih-ih*0.5)/2" -c:a copy "$outputPath"';
+      // 9:16 비율 (aspect ratio = 9/16 = 0.5625) 카메라 프리뷰 영역 추출
+      // 전체 화면에서 9:16 비율 영역을 중앙에 배치하고, 하단 150px 제외
+      // 
+      // 계산 로직:
+      // 1. 전체 영상 해상도에서 하단 150px에 해당하는 비율 제외 (ih*0.92 정도로 추정)
+      // 2. 남은 영역에서 9:16 비율 적용
+      // 3. 중앙 배치를 위한 오프셋 계산
+      //
+      // crop 파라미터: width:height:x:y
+      // - width: 9:16 비율을 위해 min(iw, (ih-150)*9/16) 
+      // - height: 하단 150px 제외한 높이에서 9:16 비율 맞춤
+      // - x, y: 중앙 배치 오프셋
+      
+      // 더 정확한 계산을 위해 두 가지 경우 고려:
+      // Case 1: 너비 기준 - (ih-150)*9/16 < iw 인 경우
+      // Case 2: 높이 기준 - (ih-150)*9/16 >= iw 인 경우
+      
+      final command = '''
+        -i "$inputPath" 
+        -vf "crop=min(iw\\,trunc((ih*0.85)*9/16)*2):trunc(ih*0.85):(iw-min(iw\\,trunc((ih*0.85)*9/16)*2))/2:trunc(ih*0.075)" 
+        -c:a copy "$outputPath"
+      '''.replaceAll('\n', '').replaceAll(RegExp(r'\s+'), ' ').trim();
       
       // 입력 비디오 해상도 검증 (최소 요구사항 확인)
       logs.add('📹 입력 비디오 해상도 검증 중...');
@@ -377,8 +394,9 @@ class VideoProcessingService {
       logs.add('⚙️ FFmpeg 명령어 시작: $command');
       logs.add('📁 입력 파일: $inputPath');
       logs.add('📁 출력 파일: $outputPath');
-      logs.add('🎯 크롭 비율: 50% 크기 (중앙 영역)');
-      logs.add('🎬 화질 설정: 기본 설정 (단순 크롭)');
+      logs.add('🎯 크롭 영역: 9:16 비율 카메라 프리뷰 영역 (하단 150px 제외)');
+      logs.add('📐 크롭 계산: 전체 화면에서 85% 높이 기준, 9:16 비율 적용');
+      logs.add('🎬 화질 설정: 기본 설정 (정밀 크롭)');
       
       // FFmpeg 실행
       final session = await FFmpegKit.executeAsync(
