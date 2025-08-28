@@ -56,6 +56,10 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
   bool _isProcessing = false;
   String _statusText = '녹화 준비됨';
 
+  // 녹화 시간 관련 변수들
+  Timer? _recordingTimer;
+  int _recordingSeconds = 0;
+
   @override
   void initState() {
     super.initState();
@@ -118,6 +122,9 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
   void dispose() {
     _controller?.dispose();
     _faceDetector.close();
+
+    // 녹화 타이머 정리
+    _recordingTimer?.cancel();
 
     // 이마 이미지 리소스 정리
     ForeheadRectangleService.disposeTextureImage();
@@ -344,6 +351,31 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
     return allBytes.done().buffer.asUint8List();
   }
 
+  // 녹화 타이머 시작
+  void _startRecordingTimer() {
+    _recordingSeconds = 0;
+    _recordingTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (mounted) {
+        setState(() {
+          _recordingSeconds++;
+        });
+      }
+    });
+  }
+
+  // 녹화 타이머 중지
+  void _stopRecordingTimer() {
+    _recordingTimer?.cancel();
+    _recordingTimer = null;
+  }
+
+  // 녹화 시간을 문자열로 포맷
+  String _formatRecordingTime(int seconds) {
+    int minutes = seconds ~/ 60;
+    int remainingSeconds = seconds % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${remainingSeconds.toString().padLeft(2, '0')}';
+  }
+
   // 녹화 시작 (flutter_screen_recording 사용)
   Future<void> _startRecording() async {
     // 권한 확인
@@ -372,6 +404,9 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
             const SnackBar(content: Text('화면 녹화를 시작할 수 없습니다')),
           );
         }
+      } else {
+        // 녹화가 성공적으로 시작되면 타이머 시작
+        _startRecordingTimer();
       }
     } catch (e) {
       setState(() {
@@ -388,6 +423,9 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
 
   // 녹화 중지 (flutter_screen_recording 사용)
   Future<void> _stopRecording() async {
+    // 타이머 중지
+    _stopRecordingTimer();
+
     setState(() {
       _isRecording = false;
       _isProcessing = true;
@@ -531,6 +569,7 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
                             ),
                           ),
                         ),
+
                         // 이마 이미지 오버레이 (얼굴이 감지되고 이마 사각형이 있을 때만)
                         if (_currentForeheadRectangle != null &&
                             _currentForeheadRectangle!.isValid)
@@ -564,6 +603,31 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
                               screenHeight - (topOffset + cameraHeight) + 60,
                           child: const RankingSlotPanel(),
                         ),
+                        // 녹화 시간 표시 (녹화 중일 때만, 녹화버튼 우측에)
+                        if (_isRecording)
+                          Positioned(
+                            bottom: 65,
+                            right: 50,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.8),
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Text(
+                                _formatRecordingTime(_recordingSeconds),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  fontFamily: 'monospace',
+                                ),
+                              ),
+                            ),
+                          ),
                         // 중앙 하단 녹화 버튼
                         Positioned(
                           bottom: 50,
