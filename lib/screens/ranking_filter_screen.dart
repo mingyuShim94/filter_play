@@ -503,6 +503,7 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
                     totalBalloons: 0, // 임시 값
                     videoPath: processingResult.outputPath,
                     isOriginalVideo: false, // 카메라 영역 추출된 영상임을 표시
+                    originalVideoPath: originalVideoPath, // 원본 영상 경로 전달
                   ),
                 ),
               );
@@ -531,6 +532,7 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
                     totalBalloons: 0, // 임시 값
                     videoPath: null, // 카메라 영역 추출 실패로 비디오 없음
                     processingError: processingResult.error, // 에러 정보 전달
+                    originalVideoPath: originalVideoPath, // 원본 영상 경로 전달
                   ),
                 ),
               );

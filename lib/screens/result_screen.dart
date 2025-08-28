@@ -4,28 +4,31 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:video_player/video_player.dart';
 import '../services/video_processing_service.dart';
+import '../services/gallery_service.dart';
 
 class ResultScreen extends ConsumerWidget {
   final int score;
   final int totalBalloons;
-  final String? videoPath; // 동영상 경로 추가
+  final String? videoPath; // 동영상 경로 추가 (크롭된 영상)
   final bool isOriginalVideo; // 원본 영상인지 크롭된 영상인지
   final VideoProcessingError? processingError; // 비디오 처리 에러 정보
+  final String? originalVideoPath; // 원본 영상 경로
 
   const ResultScreen({
     super.key,
     required this.score,
     required this.totalBalloons,
-    this.videoPath, // 선택적 매개변수
+    this.videoPath, // 선택적 매개변수 (크롭된 영상)
     this.isOriginalVideo = true, // 기본값은 원본 영상
     this.processingError, // 에러 정보 (선택적)
+    this.originalVideoPath, // 원본 영상 경로 (선택적)
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // 에러 모드 확인
     final isErrorMode = processingError != null;
-    
+
     // 0으로 나누기 방지
     final percentage =
         totalBalloons > 0 ? (score / totalBalloons * 100).round() : 0;
@@ -33,20 +36,21 @@ class ResultScreen extends ConsumerWidget {
     final isGood = percentage >= 60;
 
     // 동영상 전용 모드인지 확인
-    final isVideoOnlyMode = videoPath != null && totalBalloons == 0 && !isErrorMode;
+    final isVideoOnlyMode =
+        videoPath != null && totalBalloons == 0 && !isErrorMode;
 
     return Scaffold(
       backgroundColor: isErrorMode
           ? Colors.red[50]
           : isVideoOnlyMode
-          ? Colors.black
-          : (isExcellent ? Colors.amber[50] : Colors.blue[50]),
+              ? Colors.black
+              : (isExcellent ? Colors.amber[50] : Colors.blue[50]),
       appBar: AppBar(
-        title: Text(isErrorMode 
-            ? '비디오 처리 오류' 
-            : isVideoOnlyMode 
-            ? '녹화 영상' 
-            : '게임 결과'),
+        title: Text(isErrorMode
+            ? '비디오 처리 오류'
+            : isVideoOnlyMode
+                ? '녹화 영상'
+                : '게임 결과'),
         backgroundColor: Colors.transparent,
         elevation: 0,
         foregroundColor: isVideoOnlyMode ? Colors.white : null,
@@ -54,165 +58,200 @@ class ResultScreen extends ConsumerWidget {
             isVideoOnlyMode ? const IconThemeData(color: Colors.white) : null,
       ),
       body: isErrorMode
-          ? 
+          ?
           // 에러 정보 표시 모드
           ErrorInfoWidget(error: processingError!)
           : isVideoOnlyMode
-          ?
-          // 동영상 전용 모드 - 오버플로우 방지, 여백 제거
-          VideoPreviewWidget(
-              videoPath: videoPath!,
-              isVideoOnlyMode: true,
-              processingError: processingError, // FFmpeg 에러 정보 전달
-            )
-          :
-          // 일반 게임 결과 모드
-          SizedBox(
-              width: double.infinity,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  // 게임 결과 모드
-
-                  Text(
-                    isExcellent
-                        ? '🎉'
-                        : isGood
-                            ? '😊'
-                            : '😔',
-                    style: const TextStyle(fontSize: 80),
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  Text(
-                    isExcellent
-                        ? '완벽해요!'
-                        : isGood
-                            ? '잘했어요!'
-                            : '다시 도전해보세요!',
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: isExcellent
-                              ? Colors.amber[700]
-                              : Colors.blue[700],
+              ?
+              // 동영상 전용 모드 - 오버플로우 방지, 여백 제거
+              Column(
+                  children: [
+                    Expanded(
+                      flex: 3,
+                      child: Container(
+                        color: Colors.amber,
+                        child: VideoPreviewWidget(
+                          videoPath: videoPath!,
+                          isVideoOnlyMode: true,
+                          processingError: processingError, // FFmpeg 에러 정보 전달
                         ),
-                  ),
-                  const SizedBox(height: 32),
-
-                  Container(
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.1),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
+                      ),
                     ),
-                    child: Column(
-                      children: [
-                        Text(
-                          '터뜨린 풍선',
-                          style: Theme.of(context).textTheme.titleMedium,
+                    // 갤러리 저장 버튼들을 동영상 전용 모드에도 추가
+                    if (originalVideoPath != null || videoPath != null)
+                      Expanded(
+                        flex: 1,
+                        child: Container(
+                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                          child: _GallerySaveButtons(
+                            originalVideoPath: originalVideoPath,
+                            croppedVideoPath: videoPath,
+                          ),
                         ),
-                        const SizedBox(height: 8),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.baseline,
-                          textBaseline: TextBaseline.alphabetic,
+                      ),
+                  ],
+                )
+              :
+              // 일반 게임 결과 모드
+              SizedBox(
+                  width: double.infinity,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      // 게임 결과 모드
+
+                      Text(
+                        isExcellent
+                            ? '🎉'
+                            : isGood
+                                ? '😊'
+                                : '😔',
+                        style: const TextStyle(fontSize: 80),
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      Text(
+                        isExcellent
+                            ? '완벽해요!'
+                            : isGood
+                                ? '잘했어요!'
+                                : '다시 도전해보세요!',
+                        style: Theme.of(context)
+                            .textTheme
+                            .headlineMedium
+                            ?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: isExcellent
+                                  ? Colors.amber[700]
+                                  : Colors.blue[700],
+                            ),
+                      ),
+                      const SizedBox(height: 32),
+
+                      Container(
+                        padding: const EdgeInsets.all(24),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.1),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Column(
                           children: [
                             Text(
-                              '$score',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .displayLarge
-                                  ?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                    color: Theme.of(context).primaryColor,
-                                  ),
+                              '터뜨린 풍선',
+                              style: Theme.of(context).textTheme.titleMedium,
                             ),
+                            const SizedBox(height: 8),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.baseline,
+                              textBaseline: TextBaseline.alphabetic,
+                              children: [
+                                Text(
+                                  '$score',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .displayLarge
+                                      ?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                        color: Theme.of(context).primaryColor,
+                                      ),
+                                ),
+                                Text(
+                                  ' / $totalBalloons',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .headlineMedium
+                                      ?.copyWith(
+                                        color: Colors.grey[600],
+                                      ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
                             Text(
-                              ' / $totalBalloons',
+                              '$percentage% 성공!',
                               style: Theme.of(context)
                                   .textTheme
-                                  .headlineMedium
+                                  .titleLarge
                                   ?.copyWith(
-                                    color: Colors.grey[600],
+                                    color: Theme.of(context).primaryColor,
+                                    fontWeight: FontWeight.w600,
                                   ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 8),
-                        Text(
-                          '$percentage% 성공!',
-                          style:
-                              Theme.of(context).textTheme.titleLarge?.copyWith(
-                                    color: Theme.of(context).primaryColor,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 48),
-
-                  // 녹화 영상 미리보기
-                  if (videoPath != null)
-                    VideoPreviewWidget(
-                      videoPath: videoPath!,
-                      isVideoOnlyMode: false,
-                      processingError: processingError, // FFmpeg 에러 정보 전달
-                    )
-                  else
-                    Container(
-                      width: double.infinity,
-                      height: 60,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[300],
-                        borderRadius: BorderRadius.circular(12),
                       ),
-                      child: const Center(
-                        child: Text(
-                          '📹 녹화된 영상이 없습니다',
-                          style: TextStyle(
-                            color: Colors.grey,
-                            fontWeight: FontWeight.w500,
+                      const SizedBox(height: 48),
+
+                      // 녹화 영상 미리보기
+                      if (videoPath != null)
+                        VideoPreviewWidget(
+                          videoPath: videoPath!,
+                          isVideoOnlyMode: false,
+                          processingError: processingError, // FFmpeg 에러 정보 전달
+                        )
+                      else
+                        Container(
+                          width: double.infinity,
+                          height: 60,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[300],
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Center(
+                            child: Text(
+                              '📹 녹화된 영상이 없습니다',
+                              style: TextStyle(
+                                color: Colors.grey,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
                           ),
                         ),
-                      ),
-                    ),
 
-                  // 액션 버튼들
-                  const SizedBox(height: 24),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () {
-                            Navigator.popUntil(
-                                context, (route) => route.isFirst);
-                          },
-                          child: const Text('홈으로'),
+                      // 갤러리 저장 버튼들
+                      const SizedBox(height: 24),
+                      if (originalVideoPath != null || videoPath != null)
+                        _GallerySaveButtons(
+                          originalVideoPath: originalVideoPath,
+                          croppedVideoPath: videoPath,
                         ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () {
-                            Navigator.pop(context);
-                          },
-                          child: const Text('다시하기'),
-                        ),
+
+                      // 액션 버튼들
+                      const SizedBox(height: 24),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () {
+                                Navigator.popUntil(
+                                    context, (route) => route.isFirst);
+                              },
+                              child: const Text('홈으로'),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: () {
+                                Navigator.pop(context);
+                              },
+                              child: const Text('다시하기'),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                ],
-              ),
-            ),
+                ),
     );
   }
 }
@@ -294,13 +333,13 @@ class _VideoPreviewWidgetState extends State<VideoPreviewWidget> {
 
   void _copyErrorToClipboard() async {
     // FFmpeg 처리 에러 정보 포함
-    final ffmpegErrorInfo = widget.processingError != null 
+    final ffmpegErrorInfo = widget.processingError != null
         ? '''
 
 FFmpeg 비디오 처리 에러 정보:
 ==============================
 ${widget.processingError!.toDetailedString()}
-''' 
+'''
         : '';
 
     final errorInfo = '''
@@ -323,7 +362,7 @@ ${widget.processingError!.toDetailedString()}
 ''';
 
     await Clipboard.setData(ClipboardData(text: errorInfo));
-    
+
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -361,32 +400,23 @@ ${widget.processingError!.toDetailedString()}
   Widget build(BuildContext context) {
     if (widget.isVideoOnlyMode) {
       // 동영상 전용 모드일 때 화면에 맞게 크기 조정
-      return SafeArea(
-        child: Container(
-          width: double.infinity,
-          height: double.infinity,
-          padding: const EdgeInsets.all(16.0), // 여백 추가
-          child: _isInitialized
-              ? Center(
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      maxWidth: MediaQuery.of(context).size.width - 32,
-                      maxHeight: MediaQuery.of(context).size.height * 0.8, // 화면 높이의 80%로 제한
-                    ),
-                    child: AspectRatio(
-                      aspectRatio: _controller.value.aspectRatio,
-                      child: _buildVideoPreview(),
-                    ),
-                  ),
-                )
-              : _buildVideoPreview(), // 로딩 중이거나 오류일 때
-        ),
+      return SizedBox(
+        width: double.infinity,
+        height: double.infinity,
+        child: _isInitialized
+            ? Center(
+                child: AspectRatio(
+                  aspectRatio: _controller.value.aspectRatio,
+                  child: _buildVideoPreview(),
+                ),
+              )
+            : _buildVideoPreview(), // 로딩 중이거나 오류일 때
       );
     } else {
-      // 일반 모드일 때는 고정 높이
+      // 일반 모드일 때는 고정 높이 (20% 감소: 200 -> 160)
       return Container(
         width: double.infinity,
-        height: 200,
+        height: 160,
         decoration: BoxDecoration(
           color: Colors.black,
           borderRadius: BorderRadius.circular(12),
@@ -552,7 +582,8 @@ ${widget.processingError!.toDetailedString()}
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.red,
                       foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
                     ),
                   ),
                   ElevatedButton.icon(
@@ -562,7 +593,8 @@ ${widget.processingError!.toDetailedString()}
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blue,
                       foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
                     ),
                   ),
                 ],
@@ -905,7 +937,7 @@ class ErrorInfoWidget extends StatelessWidget {
               ],
             ),
           ),
-          
+
           const SizedBox(height: 16),
 
           // 에러 상세 정보
@@ -926,9 +958,10 @@ class ErrorInfoWidget extends StatelessWidget {
                     children: [
                       Text(
                         '상세 에러 정보',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
+                        style:
+                            Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
                       ),
                       const Spacer(),
                       ElevatedButton.icon(
@@ -944,9 +977,9 @@ class ErrorInfoWidget extends StatelessWidget {
                       ),
                     ],
                   ),
-                  
+
                   const SizedBox(height: 12),
-                  
+
                   // 에러 정보 스크롤뷰
                   Expanded(
                     child: Container(
@@ -1005,7 +1038,7 @@ class ErrorInfoWidget extends StatelessWidget {
 
   void _copyErrorToClipboard(BuildContext context) async {
     await Clipboard.setData(ClipboardData(text: error.toDetailedString()));
-    
+
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -1013,6 +1046,309 @@ class ErrorInfoWidget extends StatelessWidget {
           duration: Duration(seconds: 2),
         ),
       );
+    }
+  }
+}
+
+// 갤러리 저장 버튼 위젯
+class _GallerySaveButtons extends StatefulWidget {
+  final String? originalVideoPath;
+  final String? croppedVideoPath;
+
+  const _GallerySaveButtons({
+    this.originalVideoPath,
+    this.croppedVideoPath,
+  });
+
+  @override
+  State<_GallerySaveButtons> createState() => _GallerySaveButtonsState();
+}
+
+class _GallerySaveButtonsState extends State<_GallerySaveButtons> {
+  bool _isOriginalSaving = false;
+  bool _isCroppedSaving = false;
+  double _originalProgress = 0.0;
+  double _croppedProgress = 0.0;
+  String _originalStatus = '';
+  String _croppedStatus = '';
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        // 갤러리 저장 제목
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Text(
+            '📁 갤러리 저장',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).primaryColor,
+                ),
+            textAlign: TextAlign.center,
+          ),
+        ),
+
+        const SizedBox(height: 12),
+
+        // 저장 버튼들
+        if (widget.originalVideoPath != null || widget.croppedVideoPath != null)
+          Row(
+            children: [
+              // 원본 영상 저장 버튼
+              if (widget.originalVideoPath != null)
+                Expanded(
+                  child: Column(
+                    children: [
+                      ElevatedButton.icon(
+                        onPressed: _isOriginalSaving
+                            ? null
+                            : () => _saveOriginalToGallery(),
+                        icon: Icon(
+                          _isOriginalSaving
+                              ? Icons.hourglass_empty
+                              : Icons.video_file,
+                          size: 20,
+                        ),
+                        label: Text(
+                          _isOriginalSaving ? '저장 중...' : '원본 영상',
+                          style: const TextStyle(fontSize: 13),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 10),
+                          backgroundColor: Colors.orange[600],
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                      if (_isOriginalSaving) ...[
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          height: 4,
+                          child: LinearProgressIndicator(
+                            value: _originalProgress,
+                            backgroundColor: Colors.grey[300],
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.orange[600]!),
+                          ),
+                        ),
+                        if (_originalStatus.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            _originalStatus,
+                            style: const TextStyle(
+                                fontSize: 10, color: Colors.grey),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ],
+                    ],
+                  ),
+                ),
+
+              // 버튼 사이 간격
+              if (widget.originalVideoPath != null &&
+                  widget.croppedVideoPath != null)
+                const SizedBox(width: 12),
+
+              // 크롭 영상 저장 버튼
+              if (widget.croppedVideoPath != null)
+                Expanded(
+                  child: Column(
+                    children: [
+                      ElevatedButton.icon(
+                        onPressed: _isCroppedSaving
+                            ? null
+                            : () => _saveCroppedToGallery(),
+                        icon: Icon(
+                          _isCroppedSaving ? Icons.hourglass_empty : Icons.crop,
+                          size: 20,
+                        ),
+                        label: Text(
+                          _isCroppedSaving ? '저장 중...' : '카메라 영상',
+                          style: const TextStyle(fontSize: 13),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 10),
+                          backgroundColor: Colors.purple[600],
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                      if (_isCroppedSaving) ...[
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          height: 4,
+                          child: LinearProgressIndicator(
+                            value: _croppedProgress,
+                            backgroundColor: Colors.grey[300],
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.purple[600]!),
+                          ),
+                        ),
+                        if (_croppedStatus.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            _croppedStatus,
+                            style: const TextStyle(
+                                fontSize: 10, color: Colors.grey),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ],
+                    ],
+                  ),
+                ),
+            ],
+          ),
+      ],
+    );
+  }
+
+  // 원본 영상을 갤러리에 저장
+  Future<void> _saveOriginalToGallery() async {
+    if (widget.originalVideoPath == null || _isOriginalSaving) return;
+
+    setState(() {
+      _isOriginalSaving = true;
+      _originalProgress = 0.0;
+      _originalStatus = '저장 준비 중...';
+    });
+
+    try {
+      final result = await GalleryService.saveVideoToGallery(
+        filePath: widget.originalVideoPath!,
+        albumName: 'FilterPlay',
+        progressCallback: (progress, status) {
+          if (mounted) {
+            setState(() {
+              _originalProgress = progress;
+              _originalStatus = status;
+            });
+          }
+        },
+      );
+
+      if (mounted) {
+        setState(() {
+          _isOriginalSaving = false;
+          _originalProgress = 0.0;
+          _originalStatus = '';
+        });
+
+        if (result.success) {
+          // 성공 스낵바 및 갤러리 열기 옵션
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('원본 영상이 갤러리에 저장되었습니다! ✅'),
+              action: SnackBarAction(
+                label: '갤러리 열기',
+                onPressed: () => GalleryService.openGallery(),
+              ),
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        } else {
+          // 실패 스낵바
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('저장 실패: ${result.message}'),
+              backgroundColor: Colors.red[600],
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isOriginalSaving = false;
+          _originalProgress = 0.0;
+          _originalStatus = '';
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('저장 중 오류 발생: $e'),
+            backgroundColor: Colors.red[600],
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    }
+  }
+
+  // 크롭된 영상을 갤러리에 저장
+  Future<void> _saveCroppedToGallery() async {
+    if (widget.croppedVideoPath == null || _isCroppedSaving) return;
+
+    setState(() {
+      _isCroppedSaving = true;
+      _croppedProgress = 0.0;
+      _croppedStatus = '저장 준비 중...';
+    });
+
+    try {
+      final result = await GalleryService.saveVideoToGallery(
+        filePath: widget.croppedVideoPath!,
+        albumName: 'FilterPlay',
+        progressCallback: (progress, status) {
+          if (mounted) {
+            setState(() {
+              _croppedProgress = progress;
+              _croppedStatus = status;
+            });
+          }
+        },
+      );
+
+      if (mounted) {
+        setState(() {
+          _isCroppedSaving = false;
+          _croppedProgress = 0.0;
+          _croppedStatus = '';
+        });
+
+        if (result.success) {
+          // 성공 스낵바 및 갤러리 열기 옵션
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('카메라 영상이 갤러리에 저장되었습니다! ✅'),
+              action: SnackBarAction(
+                label: '갤러리 열기',
+                onPressed: () => GalleryService.openGallery(),
+              ),
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        } else {
+          // 실패 스낵바
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('저장 실패: ${result.message}'),
+              backgroundColor: Colors.red[600],
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isCroppedSaving = false;
+          _croppedProgress = 0.0;
+          _croppedStatus = '';
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('저장 중 오류 발생: $e'),
+            backgroundColor: Colors.red[600],
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
     }
   }
 }
