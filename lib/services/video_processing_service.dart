@@ -401,10 +401,26 @@ class VideoProcessingService {
       final cropY =
           'trunc(ih*${(topOffset / screenHeight).toStringAsFixed(6)})';
 
+      // 플랫폼별 하드웨어 가속 인코더 선택
+      String videoEncoder;
+      String encoderType;
+      
+      if (Platform.isIOS) {
+        videoEncoder = "h264_videotoolbox";
+        encoderType = "iOS VideoToolbox 하드웨어 가속";
+      } else if (Platform.isAndroid) {
+        videoEncoder = "h264_mediacodec";
+        encoderType = "Android MediaCodec 하드웨어 가속";
+      } else {
+        videoEncoder = "libx264";
+        encoderType = "CPU 기반 소프트웨어 (fallback)";
+      }
+
+      // 하드웨어 가속 최적화 명령어 (비트레이트 기반 화질 제어)
       final command = '''
         -i "$inputPath" 
         -vf "crop=$cropWidth:$cropHeight:$cropX:$cropY" 
-        -c:v libx264 -crf 15 -preset medium -r 46 -pix_fmt yuv420p
+        -c:v $videoEncoder -b:v 10M
         -c:a copy "$outputPath"
       '''
           .replaceAll('\n', '')
@@ -427,8 +443,9 @@ class VideoProcessingService {
       logs.add('📁 출력 파일: $outputPath');
       logs.add('🎯 크롭 방식: Flutter 카메라 프리뷰 영역 정확 매칭');
       logs.add('📐 크롭 계산: 화면 좌표 → 비디오 해상도 비율 변환');
-      logs.add('🎬 화질 설정: H.264 CRF 15 (고화질), 46fps 유지, yuv420p');
-      logs.add('🔊 오디오 설정: AAC 원본 복사 (재압축 없음)');
+      logs.add('🚀 비디오 인코더: $encoderType');
+      logs.add('🎬 화질 설정: H.264 비트레이트 10Mbps (하드웨어 최적화)');
+      logs.add('🔊 오디오 설정: 원본 복사 (재압축 없음)');
 
       // FFmpeg 실행
       final session = await FFmpegKit.executeAsync(
@@ -561,9 +578,20 @@ class VideoProcessingService {
             log.contains('Invalid crop') ||
             log.contains('out of bounds'));
 
+        final hasHardwareEncoderError = logs.any((log) =>
+            log.contains('h264_videotoolbox') ||
+            log.contains('h264_mediacodec') ||
+            log.contains('hardware acceleration') ||
+            log.contains('VideoToolbox') ||
+            log.contains('MediaCodec') ||
+            log.contains('encoder not found') ||
+            log.contains('No hardware acceleration'));
+
         if (hasInvalidDimensions) {
           detailedMessage +=
               ' [해상도 오류: 가로/세로 크기가 2로 나누어지지 않음 - Android 호환성 문제]';
+        } else if (hasHardwareEncoderError) {
+          detailedMessage += ' [하드웨어 인코더 오류: 기기에서 하드웨어 가속을 지원하지 않음 - CPU 인코더로 재시도 필요]';
         } else if (hasCodecError) {
           detailedMessage += ' [코덱 오류: H.264 인코딩 문제 - ExoPlayer 호환성 이슈]';
         } else if (hasCropError) {
