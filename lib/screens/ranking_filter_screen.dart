@@ -81,8 +81,8 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
   void initState() {
     super.initState();
 
-    // 기본 시스템 UI 모드 유지 (상태바와 내비게이션 바 표시)
-    // SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersive); // 주석 처리
+    // 상태바 숨기기 (immersive 모드)
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersive);
 
     _requestPermissionsAndInitialize();
 
