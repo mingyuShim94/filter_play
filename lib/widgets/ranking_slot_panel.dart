@@ -17,48 +17,70 @@ class RankingSlotPanel extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final rankingSlots = ref.watch(rankingSlotsProvider);
-
-    return SizedBox(
+    return const SizedBox(
       width: 120,
       child: Column(
         children: [
-          // 랭킹 슬롯들
+          // 랭킹 슬롯들 - 개별 Consumer로 최적화
           Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              itemCount: 10,
-              itemBuilder: (context, index) {
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Center(
-                    child: RankingSlotWidget(
-                      key: ValueKey(
-                          'slot_${index}_${rankingSlots[index]?.id ?? 'empty'}'),
-                      rank: index + 1,
-                      item: rankingSlots[index],
-                      onTap: () {
-                        ref
-                            .read(rankingGameProvider.notifier)
-                            .placeItemAtRank(index);
-                        onSlotTap?.call();
-                      },
-                      onLongPress: () {
-                        // 길게 누르면 아이템 제거 (재배치 기능)
-                        if (rankingSlots[index] != null) {
-                          ref
-                              .read(rankingGameProvider.notifier)
-                              .removeItemFromRank(index);
-                        }
-                      },
-                    ),
-                  ),
-                );
-              },
-            ),
+            child: _OptimizedRankingSlotsList(),
           ),
         ],
       ),
+    );
+  }
+}
+
+// 개별 슬롯별 Consumer를 통한 선택적 리빌드 최적화
+class _OptimizedRankingSlotsList extends StatelessWidget {
+  const _OptimizedRankingSlotsList();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      children: List.generate(10, (index) => 
+        Padding(
+          padding: const EdgeInsets.only(bottom: 6),
+          child: Center(
+            child: _IndividualSlotConsumer(slotIndex: index),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// 개별 슬롯용 Consumer - 해당 슬롯만 변경될 때만 리빌드
+class _IndividualSlotConsumer extends ConsumerWidget {
+  final int slotIndex;
+  
+  const _IndividualSlotConsumer({required this.slotIndex});
+  
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    // 특정 슬롯 인덱스만 감시하여 해당 슬롯 변경시에만 리빌드
+    final slotItem = ref.watch(rankingSlotsProvider.select((slots) => 
+      slotIndex < slots.length ? slots[slotIndex] : null));
+    
+    return RankingSlotWidget(
+      key: ValueKey('slot_${slotIndex}_${slotItem?.id ?? 'empty'}'),
+      rank: slotIndex + 1,
+      item: slotItem,
+      onTap: () {
+        final rankingGame = ref.read(rankingGameProvider.notifier);
+        rankingGame.placeItemAtRank(slotIndex);
+        // onSlotTap 콜백은 부모에서 처리
+        if (context.findAncestorWidgetOfExactType<RankingSlotPanel>()?.onSlotTap != null) {
+          context.findAncestorWidgetOfExactType<RankingSlotPanel>()!.onSlotTap!();
+        }
+      },
+      onLongPress: () {
+        // 길게 누르면 아이템 제거 (재배치 기능)
+        if (slotItem != null) {
+          ref.read(rankingGameProvider.notifier).removeItemFromRank(slotIndex);
+        }
+      },
     );
   }
 }
@@ -72,6 +94,39 @@ class RankingSlotWidget extends ConsumerWidget {
   // 이미지 정보 캐시 (깜빡임 방지)
   static final Map<String, ui.Image> _imageInfoCache = {};
   static final Map<String, bool> _imageIsPortraitCache = {};
+  
+  // 미리 로드된 이미지 위젯 캐시
+  static final Map<String, Widget> _preloadedImageWidgetCache = {};
+  
+  // 이미진 로딩 상태 추적
+  static final Set<String> _loadingImages = {};
+  
+  // 정적 상수들 - 리빌드 시 재사용
+  static const Duration _animationDuration = Duration(milliseconds: 300);
+  static const double _containerWidth = 54.0;
+  static const double _containerHeight = 54.0;
+  static const BorderRadius _containerBorderRadius = BorderRadius.all(Radius.circular(15));
+  static const BorderRadius _imageBorderRadius = BorderRadius.all(Radius.circular(13));
+  
+  // 텍스트 스타일 상수
+  static const TextStyle _rankTextStyle = TextStyle(
+    color: Colors.white,
+    fontSize: 22,
+    fontWeight: FontWeight.bold,
+  );
+  
+  static const TextStyle _itemNameTextStyle = TextStyle(
+    color: Colors.white,
+    fontSize: 10,
+    fontWeight: FontWeight.bold,
+    shadows: [
+      Shadow(
+        offset: Offset(0.5, 0.5),
+        blurRadius: 1,
+        color: Colors.black,
+      ),
+    ],
+  );
 
   const RankingSlotWidget({
     super.key,
@@ -100,9 +155,9 @@ class RankingSlotWidget extends ConsumerWidget {
       child: Align(
         alignment: Alignment.centerRight,
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 300),
-          width: 54,
-          height: 54,
+          duration: _animationDuration,
+          width: _containerWidth,
+          height: _containerHeight,
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [
@@ -110,7 +165,7 @@ class RankingSlotWidget extends ConsumerWidget {
                 Colors.white.withValues(alpha: 0.2),
               ],
             ),
-            borderRadius: BorderRadius.circular(15),
+            borderRadius: _containerBorderRadius,
             border: Border.all(
               color: Colors.white.withValues(alpha: 0.5),
               width: 1.5,
@@ -151,7 +206,7 @@ class RankingSlotWidget extends ConsumerWidget {
           height: 54,
           decoration: BoxDecoration(
             color: rankColor,
-            borderRadius: BorderRadius.circular(15),
+            borderRadius: _containerBorderRadius,
             border: Border.all(
               color: rankColor,
               width: 2,
@@ -167,11 +222,7 @@ class RankingSlotWidget extends ConsumerWidget {
           child: Center(
             child: Text(
               '$rank',
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-              ),
+              style: _rankTextStyle,
             ),
           ),
         ),
@@ -180,9 +231,9 @@ class RankingSlotWidget extends ConsumerWidget {
 
         // 이미지 슬롯 영역
         AnimatedContainer(
-          duration: const Duration(milliseconds: 300),
-          width: 54,
-          height: 54,
+          duration: _animationDuration,
+          width: _containerWidth,
+          height: _containerHeight,
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [
@@ -190,7 +241,7 @@ class RankingSlotWidget extends ConsumerWidget {
                 rankColor.withValues(alpha: 0.6),
               ],
             ),
-            borderRadius: BorderRadius.circular(15),
+            borderRadius: _containerBorderRadius,
             border: Border.all(
               color: rankColor,
               width: 2,
@@ -212,7 +263,7 @@ class RankingSlotWidget extends ConsumerWidget {
   // 선택된 슬롯 UI - 이미지만 표시 (숫자는 별도 영역에서 처리)
   Widget _buildSelectedSlot(WidgetRef ref) {
     return ClipRRect(
-      borderRadius: BorderRadius.circular(13), // 컨테이너보다 살짝 작게
+      borderRadius: _imageBorderRadius, // 컨테이너보다 살짝 작게
       child: _buildItemImage(ref),
     );
   }
@@ -385,18 +436,7 @@ class RankingSlotWidget extends ConsumerWidget {
                     alignment: Alignment.bottomCenter,
                     child: Text(
                       item?.name ?? '',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        shadows: [
-                          Shadow(
-                            offset: Offset(0.5, 0.5),
-                            blurRadius: 1,
-                            color: Colors.black,
-                          ),
-                        ],
-                      ),
+                      style: _itemNameTextStyle,
                     ),
                   ),
                 ),
@@ -426,18 +466,7 @@ class RankingSlotWidget extends ConsumerWidget {
                     alignment: Alignment.bottomCenter,
                     child: Text(
                       item?.name ?? '',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        shadows: [
-                          Shadow(
-                            offset: Offset(0.5, 0.5),
-                            blurRadius: 1,
-                            color: Colors.black,
-                          ),
-                        ],
-                      ),
+                      style: _itemNameTextStyle,
                     ),
                   ),
                 ),
@@ -563,18 +592,7 @@ class RankingSlotWidget extends ConsumerWidget {
                     alignment: Alignment.bottomCenter,
                     child: Text(
                       item?.name ?? '',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        shadows: [
-                          Shadow(
-                            offset: Offset(0.5, 0.5),
-                            blurRadius: 1,
-                            color: Colors.black,
-                          ),
-                        ],
-                      ),
+                      style: _itemNameTextStyle,
                     ),
                   ),
                 ),
@@ -653,6 +671,35 @@ class RankingSlotWidget extends ConsumerWidget {
   bool? _getCachedPortraitInfo(String imagePath) {
     final cacheKey = '${item?.id ?? 'unknown'}_$imagePath';
     return _imageIsPortraitCache[cacheKey];
+  }
+  
+  // 캐시 정리 메서드 (메모리 관리를 위한 선택적 호출)
+  static void clearImageCache() {
+    _imageInfoCache.clear();
+    _imageIsPortraitCache.clear();
+    _preloadedImageWidgetCache.clear();
+    _loadingImages.clear();
+  }
+  
+  // 특정 아이템의 캐시만 제거
+  static void clearCacheForItem(String itemId) {
+    final keysToRemove = <String>[];
+    
+    for (final key in _imageInfoCache.keys) {
+      if (key.startsWith(itemId)) keysToRemove.add(key);
+    }
+    for (final key in _imageIsPortraitCache.keys) {
+      if (key.startsWith(itemId)) keysToRemove.add(key);
+    }
+    for (final key in _preloadedImageWidgetCache.keys) {
+      if (key.contains(itemId)) keysToRemove.add(key);
+    }
+    
+    for (final key in keysToRemove) {
+      _imageInfoCache.remove(key);
+      _imageIsPortraitCache.remove(key);
+      _preloadedImageWidgetCache.remove(key);
+    }
   }
 
   Color _getRankColor(int rank) {
