@@ -60,7 +60,7 @@ class CameraNotifier extends StateNotifier<CameraState> {
 
     try {
       final success = await CameraService.initializeCamera();
-      
+
       if (success) {
         state = state.copyWith(
           isInitialized: true,
@@ -68,13 +68,13 @@ class CameraNotifier extends StateNotifier<CameraState> {
           controller: CameraService.controller,
           previewSize: CameraService.previewSize,
         );
-        
+
         // Provider들이 재계산되도록 상태 강제 갱신
         print('카메라 초기화 완료 후 상태 정보:');
         print('- canToggleCamera: ${CameraService.canToggleCamera}');
         print('- lensDirection: ${CameraService.lensDirection}');
         print('- cameraCount: ${CameraService.cameraCount}');
-        
+
         return true;
       } else {
         state = state.copyWith(
@@ -82,6 +82,7 @@ class CameraNotifier extends StateNotifier<CameraState> {
           isLoading: false,
           error: '카메라 초기화에 실패했습니다',
         );
+
         return false;
       }
     } catch (e) {
@@ -138,7 +139,7 @@ class CameraNotifier extends StateNotifier<CameraState> {
       print('CameraService.toggleCamera 호출...');
       final success = await CameraService.toggleCamera();
       print('CameraService.toggleCamera 결과: $success');
-      
+
       if (success) {
         print('카메라 전환 성공, 상태 업데이트...');
         state = state.copyWith(
@@ -245,28 +246,29 @@ final cameraStreamingProvider = Provider<bool>((ref) {
 final cameraCanToggleProvider = Provider<bool>((ref) {
   // 카메라 상태가 변경될 때마다 재계산되도록 watch 사용
   final cameraState = ref.watch(cameraProvider);
-  
+
   // 카메라가 초기화되지 않았으면 false
   if (!cameraState.isInitialized) {
     print('cameraCanToggleProvider: false (not initialized)');
     return false;
   }
-  
+
   final canToggle = CameraService.canToggleCamera;
-  print('cameraCanToggleProvider: $canToggle (cameraCount: ${CameraService.cameraCount})');
+  print(
+      'cameraCanToggleProvider: $canToggle (cameraCount: ${CameraService.cameraCount})');
   return canToggle;
 });
 
 final cameraLensDirectionProvider = Provider<CameraLensDirection?>((ref) {
   // 카메라 상태가 변경될 때마다 재계산되도록 watch 사용
   final cameraState = ref.watch(cameraProvider);
-  
+
   // 카메라가 초기화되지 않았으면 null
   if (!cameraState.isInitialized) {
     print('cameraLensDirectionProvider: null (not initialized)');
     return null;
   }
-  
+
   final direction = CameraService.lensDirection;
   print('cameraLensDirectionProvider: $direction');
   return direction;

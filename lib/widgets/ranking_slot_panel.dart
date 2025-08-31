@@ -17,13 +17,46 @@ class RankingSlotPanel extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+<<<<<<< HEAD
     return const SizedBox(
       width: 120,
+=======
+    // 🔥 [최적화] 전체 리스트 대신 길이만 watch하여 리빌드 최소화
+    final itemCount =
+        ref.watch(rankingSlotsProvider.select((slots) => slots.length));
+    final actualItemCount = itemCount > 0 ? itemCount : 10; // 초기 상태 고려
+
+    return SizedBox(
+      width: 96, // 120에서 20% 감소 (120 * 0.8 = 96)
+>>>>>>> 7f08cc1a2c4439bb74914d9d688151b2a4c96c92
       child: Column(
+        mainAxisSize: MainAxisSize.min, // 컨텐츠 크기에 맞춤
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
+<<<<<<< HEAD
           // 랭킹 슬롯들 - 개별 Consumer로 최적화
           Expanded(
             child: _OptimizedRankingSlotsList(),
+=======
+          // 랭킹 슬롯들
+          ListView.builder(
+            shrinkWrap: true, // ListView가 컨텐츠 크기에 맞춤
+            physics: const NeverScrollableScrollPhysics(), // 스크롤 비활성화
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            itemCount: actualItemCount,
+            itemBuilder: (context, index) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Center(
+                  child: RankingSlotWidget(
+                    key: ValueKey('slot_$index'), // 키 간소화
+                    rank: index + 1,
+                    onSlotTap: onSlotTap, // 콜백 전달
+                  ),
+                ),
+              );
+            },
+>>>>>>> 7f08cc1a2c4439bb74914d9d688151b2a4c96c92
           ),
         ],
       ),
@@ -87,9 +120,8 @@ class _IndividualSlotConsumer extends ConsumerWidget {
 
 class RankingSlotWidget extends ConsumerWidget {
   final int rank;
-  final RankingItem? item;
-  final VoidCallback onTap;
-  final VoidCallback? onLongPress;
+  // final RankingItem? item; // 🔥 [제거] 더 이상 부모로부터 item을 받지 않음
+  final VoidCallback? onSlotTap; // 🔥 [수정] onSlotTap 콜백을 받도록 변경
 
   // 이미지 정보 캐시 (깜빡임 방지)
   static final Map<String, ui.Image> _imageInfoCache = {};
@@ -131,33 +163,55 @@ class RankingSlotWidget extends ConsumerWidget {
   const RankingSlotWidget({
     super.key,
     required this.rank,
-    this.item,
-    required this.onTap,
-    this.onLongPress,
+    this.onSlotTap, // 🔥 [추가]
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // 🔥 [수정] 여기서 `select`를 사용하여 해당 인덱스의 아이템만 watch 합니다.
+    // 이렇게 하면 다른 슬롯이 변경되어도 이 위젯은 리빌드되지 않습니다.
+    final item = ref.watch(rankingSlotsProvider
+        .select((slots) => slots.length > rank - 1 ? slots[rank - 1] : null));
     final isEmpty = item == null;
+
+    // 🔥 [수정] onTap과 onLongPress 로직을 위젯 내부로 이동
+    onTap() {
+      ref.read(rankingGameProvider.notifier).placeItemAtRank(rank - 1);
+      onSlotTap?.call();
+    }
+
+    onLongPress() {
+      if (item != null) {
+        ref.read(rankingGameProvider.notifier).removeItemFromRank(rank - 1);
+      }
+    }
 
     return GestureDetector(
       onTap: onTap,
       onLongPress: onLongPress,
-      child: isEmpty ? _buildEmptySlotLayout() : _buildSelectedSlotLayout(ref),
+      child: isEmpty
+          ? _buildEmptySlotLayout()
+          : _buildSelectedSlotLayout(ref, item),
     );
   }
 
   // 빈 슬롯 레이아웃 - 우측 정렬하여 선택된 슬롯과 이미지 위치 맞춤
   Widget _buildEmptySlotLayout() {
     return SizedBox(
-      width: 97, // 36(숫자) + 7(간격) + 54(이미지)와 동일 (10% 축소)
-      height: 54,
+      width: 73, // 26(숫자) + 4(간격) + 43(이미지)와 동일 (20% 감소)
+      height: 43, // 54에서 20% 감소 (54 * 0.8 = 43.2 ≈ 43)
       child: Align(
         alignment: Alignment.centerRight,
         child: AnimatedContainer(
+<<<<<<< HEAD
           duration: _animationDuration,
           width: _containerWidth,
           height: _containerHeight,
+=======
+          duration: const Duration(milliseconds: 300),
+          width: 43, // 54에서 20% 감소 (54 * 0.8 = 43.2 ≈ 43)
+          height: 43, // 54에서 20% 감소
+>>>>>>> 7f08cc1a2c4439bb74914d9d688151b2a4c96c92
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [
@@ -165,10 +219,14 @@ class RankingSlotWidget extends ConsumerWidget {
                 Colors.white.withValues(alpha: 0.2),
               ],
             ),
+<<<<<<< HEAD
             borderRadius: _containerBorderRadius,
+=======
+            borderRadius: BorderRadius.circular(12), // 15에서 20% 감소 (15 * 0.8 = 12)
+>>>>>>> 7f08cc1a2c4439bb74914d9d688151b2a4c96c92
             border: Border.all(
               color: Colors.white.withValues(alpha: 0.5),
-              width: 1.5,
+              width: 1.2, // 1.5에서 20% 감소 (1.5 * 0.8 = 1.2)
             ),
             boxShadow: [
               BoxShadow(
@@ -183,7 +241,7 @@ class RankingSlotWidget extends ConsumerWidget {
               '$rank',
               style: TextStyle(
                 color: Colors.white.withValues(alpha: 0.9),
-                fontSize: 24,
+                fontSize: 14, // 18에서 20% 감소 (18 * 0.8 = 14.4 ≈ 14)
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -194,7 +252,7 @@ class RankingSlotWidget extends ConsumerWidget {
   }
 
   // 선택된 슬롯 레이아웃 - Row로 숫자 영역과 이미지 영역 분리
-  Widget _buildSelectedSlotLayout(WidgetRef ref) {
+  Widget _buildSelectedSlotLayout(WidgetRef ref, RankingItem item) {
     final rankColor = _getRankColor(rank);
 
     return Row(
@@ -202,14 +260,18 @@ class RankingSlotWidget extends ConsumerWidget {
       children: [
         // 랭킹 숫자 표시 영역
         Container(
-          width: 36,
-          height: 54,
+          width: 26, // 32에서 20% 감소 (32 * 0.8 = 25.6 ≈ 26)
+          height: 43, // 54에서 20% 감소 (54 * 0.8 = 43.2 ≈ 43)
           decoration: BoxDecoration(
             color: rankColor,
+<<<<<<< HEAD
             borderRadius: _containerBorderRadius,
+=======
+            borderRadius: BorderRadius.circular(12), // 15에서 20% 감소 (15 * 0.8 = 12)
+>>>>>>> 7f08cc1a2c4439bb74914d9d688151b2a4c96c92
             border: Border.all(
               color: rankColor,
-              width: 2,
+              width: 1.6, // 2에서 20% 감소 (2 * 0.8 = 1.6)
             ),
             boxShadow: [
               BoxShadow(
@@ -222,18 +284,33 @@ class RankingSlotWidget extends ConsumerWidget {
           child: Center(
             child: Text(
               '$rank',
+<<<<<<< HEAD
               style: _rankTextStyle,
+=======
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14, // 18에서 20% 감소 (18 * 0.8 = 14.4 ≈ 14)
+                fontWeight: FontWeight.bold,
+              ),
+>>>>>>> 7f08cc1a2c4439bb74914d9d688151b2a4c96c92
             ),
           ),
         ),
 
-        const SizedBox(width: 7),
+        const SizedBox(width: 4), // 5에서 20% 감소 (5 * 0.8 = 4)
 
         // 이미지 슬롯 영역
+
         AnimatedContainer(
+<<<<<<< HEAD
           duration: _animationDuration,
           width: _containerWidth,
           height: _containerHeight,
+=======
+          duration: const Duration(milliseconds: 300),
+          width: 43, // 54에서 20% 감소 (54 * 0.8 = 43.2 ≈ 43)
+          height: 43, // 54에서 20% 감소
+>>>>>>> 7f08cc1a2c4439bb74914d9d688151b2a4c96c92
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [
@@ -241,50 +318,59 @@ class RankingSlotWidget extends ConsumerWidget {
                 rankColor.withValues(alpha: 0.6),
               ],
             ),
+<<<<<<< HEAD
             borderRadius: _containerBorderRadius,
+=======
+            borderRadius: BorderRadius.circular(12), // 15에서 20% 감소 (15 * 0.8 = 12)
+>>>>>>> 7f08cc1a2c4439bb74914d9d688151b2a4c96c92
             border: Border.all(
               color: rankColor,
-              width: 2,
+              width: 1.6, // 2에서 20% 감소 (2 * 0.8 = 1.6)
             ),
             boxShadow: [
               BoxShadow(
                 color: rankColor.withValues(alpha: 0.3),
-                blurRadius: 4,
-                offset: const Offset(0, 2),
+                blurRadius: 3.2, // 4에서 20% 감소 (4 * 0.8 = 3.2)
+                offset: const Offset(0, 1.6), // 2에서 20% 감소 (2 * 0.8 = 1.6)
               ),
             ],
           ),
-          child: _buildSelectedSlot(ref),
+          child: _buildSelectedSlot(ref, item),
         ),
       ],
     );
   }
 
   // 선택된 슬롯 UI - 이미지만 표시 (숫자는 별도 영역에서 처리)
-  Widget _buildSelectedSlot(WidgetRef ref) {
+  Widget _buildSelectedSlot(WidgetRef ref, RankingItem item) {
     return ClipRRect(
+<<<<<<< HEAD
       borderRadius: _imageBorderRadius, // 컨테이너보다 살짝 작게
       child: _buildItemImage(ref),
+=======
+      borderRadius: BorderRadius.circular(10), // 13에서 20% 감소 (13 * 0.8 = 10.4 ≈ 10)
+      child: _buildItemImage(ref, item),
+>>>>>>> 7f08cc1a2c4439bb74914d9d688151b2a4c96c92
     );
   }
 
   // 이미지 빌드 - getImagePathProvider 사용하여 이마 위 이미지와 동일한 로직 적용
-  Widget _buildItemImage(WidgetRef ref) {
-    if (item?.assetKey != null) {
+  Widget _buildItemImage(WidgetRef ref, RankingItem item) {
+    if (item.assetKey != null) {
       // 현재 선택된 필터의 gameId 가져오기
       final selectedFilter = ref.watch(selectedFilterProvider);
 
       if (selectedFilter != null) {
         print(
-            '🎯 [RankingSlot] 이미지 로딩 시작: gameId=${selectedFilter.id}, assetKey=${item!.assetKey}');
+            '🎯 [RankingSlot] 이미지 로딩 시작: gameId=${selectedFilter.id}, assetKey=${item.assetKey}');
 
         // getImagePathProvider 사용하여 이마 위 이미지와 동일한 로직 적용
         final imagePathProvider = ref.read(getImagePathProvider);
 
         return FutureBuilder<ImagePathResult>(
           key: ValueKey(
-              '${selectedFilter.id}_${item!.assetKey}'), // 필터나 아이템 변경시 재빌드 보장
-          future: imagePathProvider(selectedFilter.id, item!.assetKey!),
+              '${selectedFilter.id}_${item.assetKey}'), // 필터나 아이템 변경시 재빌드 보장
+          future: imagePathProvider(selectedFilter.id, item.assetKey!),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               print('📍 [RankingSlot] 이미지 로딩 중...');
@@ -293,7 +379,7 @@ class RankingSlotWidget extends ConsumerWidget {
 
             if (snapshot.hasError) {
               print('❌ [RankingSlot] 이미지 로딩 에러: ${snapshot.error}');
-              return _buildFallbackImage();
+              return _buildFallbackImage(item);
             }
 
             if (snapshot.hasData) {
@@ -312,7 +398,7 @@ class RankingSlotWidget extends ConsumerWidget {
                     file,
                     errorBuilder: (context, error, stackTrace) {
                       print('❌ [RankingSlot] 로컬 이미지 로딩 실패: $error');
-                      return _buildFallbackImage();
+                      return _buildFallbackImage(item);
                     },
                   );
                 }
@@ -325,7 +411,7 @@ class RankingSlotWidget extends ConsumerWidget {
                   pathResult.remotePath!,
                   errorBuilder: (context, error, stackTrace) {
                     print('❌ [RankingSlot] 리모트 이미지 로딩 실패: $error');
-                    return _buildFallbackImage();
+                    return _buildFallbackImage(item);
                   },
                   loadingBuilder: (context, child, loadingProgress) {
                     if (loadingProgress == null) return child;
@@ -336,12 +422,13 @@ class RankingSlotWidget extends ConsumerWidget {
 
               // 이미지 비율에 따른 조건부 크롭핑
               if (imageWidget != null) {
-                return _buildConditionalCroppedImage(imageWidget, pathResult);
+                return _buildConditionalCroppedImage(
+                    imageWidget, pathResult, item);
               }
             }
 
             print('⚠️ [RankingSlot] 모든 이미지 로딩 실패, fallback 사용');
-            return _buildFallbackImage();
+            return _buildFallbackImage(item);
           },
         );
       } else {
@@ -352,14 +439,14 @@ class RankingSlotWidget extends ConsumerWidget {
     }
 
     // assetKey가 없거나 selectedFilter가 null이면 assets 이미지 시도
-    return _buildFallbackImage();
+    return _buildFallbackImage(item);
   }
 
   // Fallback 이미지 (assets 또는 기본 아이콘)
-  Widget _buildFallbackImage() {
-    if (item?.imagePath != null) {
+  Widget _buildFallbackImage(RankingItem item) {
+    if (item.imagePath != null) {
       return Image.asset(
-        item!.imagePath!,
+        item.imagePath!,
         fit: BoxFit.cover,
         alignment: Alignment.topCenter,
         errorBuilder: (context, error, stackTrace) {
@@ -377,10 +464,10 @@ class RankingSlotWidget extends ConsumerWidget {
       color: Colors.white12,
       child: const Center(
         child: SizedBox(
-          width: 20,
-          height: 20,
+          width: 16, // 20에서 20% 감소 (20 * 0.8 = 16)
+          height: 16, // 20에서 20% 감소
           child: CircularProgressIndicator(
-            strokeWidth: 2,
+            strokeWidth: 1.6, // 2에서 20% 감소 (2 * 0.8 = 1.6)
             valueColor: AlwaysStoppedAnimation<Color>(Colors.white54),
           ),
         ),
@@ -394,7 +481,7 @@ class RankingSlotWidget extends ConsumerWidget {
       color: Colors.white24,
       child: const Icon(
         Icons.person,
-        size: 32,
+        size: 26, // 32에서 20% 감소 (32 * 0.8 = 25.6 ≈ 26)
         color: Colors.white60,
       ),
     );
@@ -402,13 +489,13 @@ class RankingSlotWidget extends ConsumerWidget {
 
   // 이미지 비율에 따른 조건부 크롭핑
   Widget _buildConditionalCroppedImage(
-      Widget imageWidget, ImagePathResult pathResult) {
+      Widget imageWidget, ImagePathResult pathResult, RankingItem item) {
     // 이미지 파일이 있을 때만 크기 확인 수행
     if (pathResult.localPath != null) {
       final file = File(pathResult.localPath!);
       if (file.existsSync()) {
         final imagePath = file.path;
-        final cachedPortraitInfo = _getCachedPortraitInfo(imagePath);
+        final cachedPortraitInfo = _getCachedPortraitInfo(imagePath, item);
 
         // 캐시된 정보가 있으면 즉시 적용 (깜빡임 방지)
         if (cachedPortraitInfo != null) {
@@ -417,10 +504,10 @@ class RankingSlotWidget extends ConsumerWidget {
             return Stack(
               children: [
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(13),
+                  borderRadius: BorderRadius.circular(10), // 13에서 20% 감소 (13 * 0.8 = 10.4 ≈ 10)
                   child: SizedBox(
-                    width: 54,
-                    height: 54,
+                    width: 43, // 54에서 20% 감소 (54 * 0.8 = 43.2 ≈ 43)
+                    height: 43, // 54에서 20% 감소
                     child: FittedBox(
                       fit: BoxFit.cover,
                       child: imageWidget,
@@ -431,12 +518,28 @@ class RankingSlotWidget extends ConsumerWidget {
                 Positioned(
                   left: 0,
                   right: 0,
-                  bottom: 2,
+                  bottom: 1.6, // 2에서 20% 감소 (2 * 0.8 = 1.6)
                   child: Align(
                     alignment: Alignment.bottomCenter,
                     child: Text(
+<<<<<<< HEAD
                       item?.name ?? '',
                       style: _itemNameTextStyle,
+=======
+                      item.name,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 8, // 10에서 20% 감소 (10 * 0.8 = 8)
+                        fontWeight: FontWeight.bold,
+                        shadows: [
+                          Shadow(
+                            offset: Offset(0.4, 0.4), // 0.5에서 20% 감소 (0.5 * 0.8 = 0.4)
+                            blurRadius: 0.8, // 1에서 20% 감소 (1 * 0.8 = 0.8)
+                            color: Colors.black,
+                          ),
+                        ],
+                      ),
+>>>>>>> 7f08cc1a2c4439bb74914d9d688151b2a4c96c92
                     ),
                   ),
                 ),
@@ -447,10 +550,10 @@ class RankingSlotWidget extends ConsumerWidget {
             return Stack(
               children: [
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(13),
+                  borderRadius: BorderRadius.circular(10), // 13에서 20% 감소 (13 * 0.8 = 10.4 ≈ 10)
                   child: SizedBox(
-                    width: 54,
-                    height: 54,
+                    width: 43, // 54에서 20% 감소 (54 * 0.8 = 43.2 ≈ 43)
+                    height: 43, // 54에서 20% 감소
                     child: FittedBox(
                       fit: BoxFit.cover,
                       child: imageWidget,
@@ -461,12 +564,28 @@ class RankingSlotWidget extends ConsumerWidget {
                 Positioned(
                   left: 0,
                   right: 0,
-                  bottom: 2,
+                  bottom: 1.6, // 2에서 20% 감소 (2 * 0.8 = 1.6)
                   child: Align(
                     alignment: Alignment.bottomCenter,
                     child: Text(
+<<<<<<< HEAD
                       item?.name ?? '',
                       style: _itemNameTextStyle,
+=======
+                      item.name,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 8, // 10에서 20% 감소 (10 * 0.8 = 8)
+                        fontWeight: FontWeight.bold,
+                        shadows: [
+                          Shadow(
+                            offset: Offset(0.4, 0.4), // 0.5에서 20% 감소 (0.5 * 0.8 = 0.4)
+                            blurRadius: 0.8, // 1에서 20% 감소 (1 * 0.8 = 0.8)
+                            color: Colors.black,
+                          ),
+                        ],
+                      ),
+>>>>>>> 7f08cc1a2c4439bb74914d9d688151b2a4c96c92
                     ),
                   ),
                 ),
@@ -477,7 +596,7 @@ class RankingSlotWidget extends ConsumerWidget {
 
         // 캐시된 정보가 없을 때만 FutureBuilder 사용
         return FutureBuilder<ui.Image>(
-          future: _getImageInfo(file),
+          future: _getImageInfo(file, item),
           builder: (context, snapshot) {
             if (snapshot.hasData && snapshot.data != null) {
               final image = snapshot.data!;
@@ -502,14 +621,14 @@ class RankingSlotWidget extends ConsumerWidget {
                     Positioned(
                       left: 0,
                       right: 0,
-                      bottom: 2,
+                      bottom: 1.6, // 2에서 20% 감소 (2 * 0.8 = 1.6)
                       child: Align(
                         alignment: Alignment.bottomCenter,
                         child: Text(
-                          item?.name ?? '',
+                          item.name,
                           style: TextStyle(
                             color: Colors.white,
-                            fontSize: 10,
+                            fontSize: 8, // 10에서 20% 감소 (10 * 0.8 = 8)
                             fontWeight: FontWeight.bold,
                             shadows: [
                               Shadow(
@@ -543,14 +662,14 @@ class RankingSlotWidget extends ConsumerWidget {
                     Positioned(
                       left: 0,
                       right: 0,
-                      bottom: 2,
+                      bottom: 1.6, // 2에서 20% 감소 (2 * 0.8 = 1.6)
                       child: Align(
                         alignment: Alignment.bottomCenter,
                         child: Text(
-                          item?.name ?? '',
+                          item.name,
                           style: TextStyle(
                             color: Colors.white,
-                            fontSize: 10,
+                            fontSize: 8, // 10에서 20% 감소 (10 * 0.8 = 8)
                             fontWeight: FontWeight.bold,
                             shadows: [
                               Shadow(
@@ -573,10 +692,10 @@ class RankingSlotWidget extends ConsumerWidget {
             return Stack(
               children: [
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(13),
+                  borderRadius: BorderRadius.circular(10), // 13에서 20% 감소 (13 * 0.8 = 10.4 ≈ 10)
                   child: SizedBox(
-                    width: 54,
-                    height: 54,
+                    width: 43, // 54에서 20% 감소 (54 * 0.8 = 43.2 ≈ 43)
+                    height: 43, // 54에서 20% 감소
                     child: FittedBox(
                       fit: BoxFit.cover,
                       child: imageWidget,
@@ -587,12 +706,28 @@ class RankingSlotWidget extends ConsumerWidget {
                 Positioned(
                   left: 0,
                   right: 0,
-                  bottom: 2,
+                  bottom: 1.6, // 2에서 20% 감소 (2 * 0.8 = 1.6)
                   child: Align(
                     alignment: Alignment.bottomCenter,
                     child: Text(
+<<<<<<< HEAD
                       item?.name ?? '',
                       style: _itemNameTextStyle,
+=======
+                      item.name,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 8, // 10에서 20% 감소 (10 * 0.8 = 8)
+                        fontWeight: FontWeight.bold,
+                        shadows: [
+                          Shadow(
+                            offset: Offset(0.4, 0.4), // 0.5에서 20% 감소 (0.5 * 0.8 = 0.4)
+                            blurRadius: 0.8, // 1에서 20% 감소 (1 * 0.8 = 0.8)
+                            color: Colors.black,
+                          ),
+                        ],
+                      ),
+>>>>>>> 7f08cc1a2c4439bb74914d9d688151b2a4c96c92
                     ),
                   ),
                 ),
@@ -607,10 +742,10 @@ class RankingSlotWidget extends ConsumerWidget {
     return Stack(
       children: [
         ClipRRect(
-          borderRadius: BorderRadius.circular(13),
+          borderRadius: BorderRadius.circular(10), // 13에서 20% 감소 (13 * 0.8 = 10.4 ≈ 10)
           child: SizedBox(
-            width: 54,
-            height: 54,
+            width: 43, // 54에서 20% 감소 (54 * 0.8 = 43.2 ≈ 43)
+            height: 43, // 54에서 20% 감소
             child: FittedBox(
               fit: BoxFit.cover,
               child: imageWidget,
@@ -625,7 +760,7 @@ class RankingSlotWidget extends ConsumerWidget {
           child: Align(
             alignment: Alignment.bottomCenter,
             child: Text(
-              item?.name ?? '',
+              item.name,
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 10,
@@ -647,9 +782,9 @@ class RankingSlotWidget extends ConsumerWidget {
 
   // 이미지 파일에서 크기 정보를 획득하는 헬퍼 메서드
   // 이미지 정보를 캐시와 함께 가져오기 (깜빡임 방지)
-  Future<ui.Image> _getImageInfo(File imageFile) async {
+  Future<ui.Image> _getImageInfo(File imageFile, RankingItem item) async {
     final imagePath = imageFile.path;
-    final cacheKey = '${item?.id ?? 'unknown'}_$imagePath';
+    final cacheKey = '${item.id}_$imagePath';
 
     // 이미 캐시된 정보가 있으면 즉시 반환
     if (_imageInfoCache.containsKey(cacheKey)) {
@@ -668,8 +803,8 @@ class RankingSlotWidget extends ConsumerWidget {
   }
 
   // 캐시된 세로/가로 정보 즉시 확인 (로딩 없이)
-  bool? _getCachedPortraitInfo(String imagePath) {
-    final cacheKey = '${item?.id ?? 'unknown'}_$imagePath';
+  bool? _getCachedPortraitInfo(String imagePath, RankingItem item) {
+    final cacheKey = '${item.id}_$imagePath';
     return _imageIsPortraitCache[cacheKey];
   }
   
@@ -730,7 +865,7 @@ class RankMedalWidget extends StatelessWidget {
   const RankMedalWidget({
     super.key,
     required this.rank,
-    this.size = 24,
+    this.size = 19, // 24에서 20% 감소 (24 * 0.8 = 19.2 ≈ 19)
   });
 
   @override

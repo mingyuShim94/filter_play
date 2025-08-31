@@ -49,5 +49,7 @@
 	<string>화면 녹화 시 오디오를 함께 녹음하기 위해 마이크 권한이 필요합니다.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>녹화된 동영상을 갤러리에 저장하기 위해 권한이 필요합니다.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>동영상을 갤러리에 저장하기 위해 권한이 필요합니다.</string>
 </dict>
 </plist>
