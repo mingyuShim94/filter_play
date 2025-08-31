@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:ui' as ui;
+import 'dart:isolate';
 
 import 'package:camera/camera.dart';
 import 'package:ffmpeg_kit_flutter_new/ffmpeg_kit.dart';
@@ -8,8 +8,8 @@ import 'package:ffmpeg_kit_flutter_new/return_code.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:screenshot/screenshot.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:record/record.dart';
@@ -19,7 +19,6 @@ import '../providers/ranking_game_provider.dart';
 import '../providers/filter_provider.dart';
 import '../services/ranking_data_service.dart';
 import '../widgets/ranking_slot_panel.dart';
-import 'result_screen.dart';
 
 class TestRankingFilterScreen extends ConsumerStatefulWidget {
   const TestRankingFilterScreen({super.key});
@@ -31,8 +30,8 @@ class TestRankingFilterScreen extends ConsumerStatefulWidget {
 
 class _TestRankingFilterScreenState
     extends ConsumerState<TestRankingFilterScreen> {
-  // 캡쳐 영역을 위한 GlobalKey
-  final GlobalKey _captureKey = GlobalKey();
+  // Screenshot 컨트롤러
+  final ScreenshotController _screenshotController = ScreenshotController();
 
   // 카메라 관련 상태 변수
   CameraController? _controller;
@@ -48,10 +47,12 @@ class _TestRankingFilterScreenState
   final ValueNotifier<String> _statusNotifier = ValueNotifier('녹화 준비 완료');
   final ValueNotifier<int> _frameCountNotifier = ValueNotifier(0);
 
-  Timer? _frameCaptureTimer;
+  // Isolate 파일 저장 시스템
+  final IsolateFileSaver _isolateFileSaver = IsolateFileSaver();
+  bool _isLoopActive = false; // async 루프 제어 플래그
+
   final AudioRecorder _audioRecorder = AudioRecorder();
   Directory? _sessionDirectory; // 녹화 세션용 임시 디렉토리
-  bool _isCapturingFrame = false; // 중복 캡쳐 방지 플래그
 
   // 정확한 녹화 시간 측정을 위한 Stopwatch
   final Stopwatch _recordingStopwatch = Stopwatch();
@@ -60,6 +61,14 @@ class _TestRankingFilterScreenState
   @override
   void initState() {
     super.initState();
+
+    // Isolate 파일 저장 시스템 시작
+    _isolateFileSaver.start().then((_) {
+      print("🪡 Isolate File Saver가 준비되었습니다.");
+    }).catchError((e) {
+      print("❌ Isolate File Saver 시작 실패: $e");
+    });
+
     _requestPermissionsAndInitialize();
 
     // 위젯 트리 빌드 완료 후 랭킹 게임 초기화
@@ -114,7 +123,8 @@ class _TestRankingFilterScreenState
   @override
   void dispose() {
     // 모든 리소스 정리
-    _frameCaptureTimer?.cancel();
+    _isLoopActive = false; // async 루프 중지
+    _isolateFileSaver.stop(); // Isolate 정리
     _audioRecorder.dispose();
     _controller?.dispose();
 
@@ -228,9 +238,8 @@ class _TestRankingFilterScreenState
 
     // ValueNotifier 업데이트 (setState 대신)
     _isRecordingNotifier.value = true;
-    _statusNotifier.value = '녹화 중... 0 프레임';
+    _statusNotifier.value = '녹화 중...';
     _frameCountNotifier.value = 0;
-    _isCapturingFrame = false;
 
     try {
       // 정확한 녹화 시간 측정 시작
@@ -244,16 +253,9 @@ class _TestRankingFilterScreenState
       await _audioRecorder.start(const RecordConfig(), path: audioPath);
       print('오디오 녹음 시작: $audioPath');
 
-      // 프레임 캡쳐 타이머 시작 (20fps 목표)
-      _frameCaptureTimer =
-          Timer.periodic(const Duration(milliseconds: 50), (timer) {
-        // Flutter 렌더링이 완료된 직후에 캡쳐를 예약
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (_isRecordingNotifier.value && mounted) {
-            _captureFrameForRecording();
-          }
-        });
-      });
+      // async 루프 시작 (Timer 대신)
+      _isLoopActive = true;
+      _frameCaptureLoop();
     } catch (e) {
       print("녹화 시작 오류: $e");
       _isRecordingNotifier.value = false;
@@ -261,67 +263,61 @@ class _TestRankingFilterScreenState
     }
   }
 
-  // 프레임 캡쳐 메서드 (RepaintBoundary 최적화 적용)
-  Future<void> _captureFrameForRecording() async {
-    if (!mounted || _isCapturingFrame) return; // 위젯 unmount 또는 중복 실행 방지
+  // 새로운 지능적 프레임 캡처 루프 (Timer 대체)
+  Future<void> _frameCaptureLoop() async {
+    const targetFrameInterval = Duration(milliseconds: 50); // 20fps 목표
 
-    _isCapturingFrame = true;
-    final captureStartTime = DateTime.now(); // 성능 측정
+    while (_isLoopActive && mounted) {
+      final frameStopwatch = Stopwatch()..start();
+
+      // 캡처 및 Isolate 전송
+      await _captureAndSaveFrame();
+
+      // 목표 FPS에 맞게 대기
+      final elapsed = frameStopwatch.elapsed;
+      if (elapsed < targetFrameInterval) {
+        await Future.delayed(targetFrameInterval - elapsed);
+      }
+    }
+  }
+
+  // 완전히 새로워진 캡처 및 저장 메서드 (PNG 직접 저장, UI 스레드 최적화)
+  Future<void> _captureAndSaveFrame() async {
+    if (!mounted) return;
 
     try {
-      RenderRepaintBoundary boundary = _captureKey.currentContext!
-          .findRenderObject() as RenderRepaintBoundary;
+      // 1. Screenshot 패키지로 PNG 데이터 캡처 (가장 가벼운 작업)
+      final Uint8List? imageBytes = await _screenshotController.capture(
+        pixelRatio: 1.5,
+        delay: Duration.zero, // 딜레이 최소화
+      );
 
-      // 1.5배 해상도로 캡쳐 (품질과 성능의 균형점)
-      const double pixelRatio = 1.5;
-      final ui.Image image = await boundary.toImage(pixelRatio: pixelRatio);
-
-      // RawRGBA 포맷으로 변환 (가장 빠름)
-      final ByteData? byteData =
-          await image.toByteData(format: ui.ImageByteFormat.rawRgba);
-      image.dispose(); // 이미지 메모리 즉시 해제
-
-      if (byteData != null) {
-        final Uint8List rawBytes = byteData.buffer.asUint8List();
+      if (imageBytes != null) {
+        // 2. 파일 이름에 .png 확장자 사용
         final fileName =
-            'frame_${(_frameCountNotifier.value + 1).toString().padLeft(5, '0')}_${image.width}x${image.height}.raw';
-        final file = File('${_sessionDirectory!.path}/$fileName');
+            'frame_${(_frameCountNotifier.value + 1).toString().padLeft(5, '0')}.png';
+        final filePath = '${_sessionDirectory!.path}/$fileName';
 
-        // 파일에 비동기로 쓰기 (UI 스레드 차단 최소화)
-        await file.writeAsBytes(rawBytes, flush: true);
+        // 3. PNG 데이터를 그대로 Isolate로 보내 파일 저장 요청 (UI 스레드 차단 없음!)
+        final saveSuccess = _isolateFileSaver.saveFrame(filePath, imageBytes);
 
-        // setState 대신 ValueNotifier 업데이트 (성능 향상의 핵심!)
-        _frameCountNotifier.value = _frameCountNotifier.value + 1;
-        _statusNotifier.value = '녹화 중... ${_frameCountNotifier.value} 프래임';
-
-        // RepaintBoundary 최적화 효과 모니터링
-        final captureEndTime = DateTime.now();
-        final captureDuration =
-            captureEndTime.difference(captureStartTime).inMilliseconds;
-
-        // 성능 지수로 RepaintBoundary 효과 평가
-        if (captureDuration > 40) {
-          print(
-              '\x1b[91m🎬 ⚠️ RepaintBoundary 최적화 부족: ${captureDuration}ms (UI 스레드 경합)\x1b[0m');
-        } else if (captureDuration > 20) {
-          print(
-              '\x1b[93m🎬 ⚡ RepaintBoundary 효과 보통: ${captureDuration}ms\x1b[0m');
-        } else if (_frameCountNotifier.value % 20 == 0) {
-          // 20프레임마다 로그
-          print(
-              '\x1b[92m🎬 ✅ RepaintBoundary 최적화 성공: ${captureDuration}ms (프레임: ${_frameCountNotifier.value})\x1b[0m');
+        if (saveSuccess) {
+          _frameCountNotifier.value++;
+          _statusNotifier.value =
+              '녹화 중... ${_frameCountNotifier.value} 프레임 [미처리: ${_isolateFileSaver.pendingWrites}]';
         }
       }
     } catch (e) {
-      print("프레임 캡쳐 오류: $e");
-    } finally {
-      _isCapturingFrame = false;
+      print("프레임 캡쳐/저장 오류: $e");
     }
   }
 
   // 녹화 중지
   Future<void> _stopRecording() async {
     if (!_isRecordingNotifier.value) return;
+
+    // async 루프 중지
+    _isLoopActive = false;
 
     // 정확한 녹화 시간 측정 종료
     _recordingStopwatch.stop();
@@ -335,17 +331,20 @@ class _TestRankingFilterScreenState
     _isProcessingNotifier.value = true;
     _statusNotifier.value = '녹화 중지됨, 영상 처리 시작...';
 
-    // 타이머 정지 및 오디오 녹음 종료
-    _frameCaptureTimer?.cancel();
+    // 오디오 녹음 종료
     await _audioRecorder.stop();
     print('오디오 녹음 종료');
+
+    // 모든 프레임이 디스크에 저장될 때까지 대기
+    while (_isolateFileSaver.pendingWrites > 0) {
+      _statusNotifier.value =
+          '남은 프레임 저장 중... (${_isolateFileSaver.pendingWrites}개)';
+      await Future.delayed(const Duration(milliseconds: 100));
+    }
 
     // 비동기로 오디오 싱크 영상 합성 실행
     _executeFFmpegWithActualFPS();
   }
-
-  // 레거시 _composeVideo (이제 사용하지 않음)
-  // 새로운 _executeFFmpegWithActualFPS 메서드가 오디오 싱크 문제를 해결합니다
 
   // 실제 평균 FPS 계산 및 FFmpeg 실행
   Future<void> _executeFFmpegWithActualFPS() async {
@@ -366,32 +365,6 @@ class _TestRankingFilterScreenState
     print('  - 실제 녹화 시간: $recordingDuration초');
     print('  - 캡쳐된 프레임: $capturedFrames개');
     print('  - 실제 평균 FPS: ${actualAverageFPS.toStringAsFixed(2)}');
-
-    // .raw 파일 리스트 가져오기
-    final rawFiles = _sessionDirectory!
-        .listSync()
-        .where((file) => file is File && file.path.endsWith('.raw'))
-        .cast<File>()
-        .toList();
-    rawFiles.sort((a, b) => a.path.compareTo(b.path));
-
-    // 첫 프레임 파일명에서 해상도 추출
-    final firstFileName = rawFiles.first.path.split('/').last;
-    final match = RegExp(r'frame_\d+_(\d+x\d+)\.raw').firstMatch(firstFileName);
-    if (match == null || match.group(1) == null) {
-      _statusNotifier.value = '해상도 정보를 찾을 수 없습니다.';
-      _isProcessingNotifier.value = false;
-      return;
-    }
-    final String videoSize = match.group(1)!;
-
-    // Raw 프레임들을 하나의 파일로 합치기
-    final concatenatedRawPath = '${_sessionDirectory!.path}/video.raw';
-    final sink = File(concatenatedRawPath).openWrite();
-    for (final file in rawFiles) {
-      sink.add(await file.readAsBytes());
-    }
-    await sink.close();
 
     // 최종 결과물 경로
     final documentsDir = await getApplicationDocumentsDirectory();
@@ -416,20 +389,21 @@ class _TestRankingFilterScreenState
         ? '-c:v $videoEncoder -realtime 1 -pix_fmt yuv420p'
         : '-c:v $videoEncoder -preset ultrafast -crf 28 -pix_fmt yuv420p';
 
-    // 핵심! 실제 FPS를 사용한 FFmpeg 명령어 구성
-    final command = '-f rawvideo -pixel_format rgba -video_size $videoSize '
-        '-r ${actualAverageFPS.toStringAsFixed(2)} '
-        '-i "$concatenatedRawPath" '
+    // PNG 이미지 시퀀스를 입력으로 사용하는 FFmpeg 명령어
+    final imageInputPath = '${_sessionDirectory!.path}/frame_%05d.png';
+
+    final command = '-framerate ${actualAverageFPS.toStringAsFixed(2)} '
+        '-i "$imageInputPath" '
         '-i "$audioPath" '
         '$videoSettings '
         '-c:a aac '
         '-shortest '
         '-y "$outputPath"';
 
-    print('▶ FFmpeg 명령어 (오디오 싱크 적용):');
+    print('▶ FFmpeg 명령어 (PNG 시퀀스 적용):');
     print('  $command');
 
-    _statusNotifier.value = 'FFmpeg으로 오디오 싱크 영상 합성 중...';
+    _statusNotifier.value = 'FFmpeg으로 PNG 시퀀스 영상 합성 중...';
 
     await FFmpegKit.execute(command).then((session) async {
       final returnCode = await session.getReturnCode();
@@ -509,9 +483,9 @@ class _TestRankingFilterScreenState
                 if (snapshot.connectionState == ConnectionState.done &&
                     _controller != null &&
                     _controller!.value.isInitialized) {
-                  // RepaintBoundary로 캡쳐 영역 감싸기
-                  return RepaintBoundary(
-                    key: _captureKey,
+                  // Screenshot 위젯으로 캡쳐 영역 감싸기
+                  return Screenshot(
+                    controller: _screenshotController,
                     child: Stack(
                       fit: StackFit.expand,
                       children: [
@@ -533,7 +507,7 @@ class _TestRankingFilterScreenState
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.5),
+                              color: Colors.black.withValues(alpha: 0.5),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: ValueListenableBuilder<String>(
@@ -584,5 +558,95 @@ class _TestRankingFilterScreenState
         },
       ),
     );
+  }
+}
+
+// Isolate 진입점 함수 (파일 저장 전용)
+void saveFrameIsolateEntry(SendPort sendPort) {
+  final receivePort = ReceivePort();
+  sendPort.send(receivePort.sendPort);
+
+  receivePort.listen((message) {
+    if (message is Map<String, dynamic>) {
+      final action = message['action'] as String;
+
+      if (action == 'save') {
+        final filePath = message['filePath'] as String;
+        final imageData = message['imageData'] as Uint8List;
+
+        try {
+          final file = File(filePath);
+          file.writeAsBytesSync(imageData, flush: true);
+          sendPort.send({'status': 'success', 'filePath': filePath});
+        } catch (e) {
+          sendPort.send({'status': 'error', 'error': e.toString()});
+        }
+      } else if (action == 'stop') {
+        receivePort.close();
+      }
+    }
+  });
+}
+
+// Isolate 파일 저장 관리 클래스
+class IsolateFileSaver {
+  Isolate? _isolate;
+  SendPort? _sendPort;
+  ReceivePort? _receivePort;
+  int _pendingWrites = 0;
+
+  int get pendingWrites => _pendingWrites;
+
+  Future<void> start() async {
+    _receivePort = ReceivePort();
+
+    _isolate = await Isolate.spawn(
+      saveFrameIsolateEntry,
+      _receivePort!.sendPort,
+    );
+
+    final completer = Completer<SendPort>();
+    _receivePort!.listen((message) {
+      if (message is SendPort) {
+        completer.complete(message);
+      } else if (message is Map<String, dynamic>) {
+        final status = message['status'] as String;
+        if (status == 'success' || status == 'error') {
+          _pendingWrites =
+              (_pendingWrites - 1).clamp(0, double.infinity).toInt();
+        }
+        if (status == 'error') {
+          print('Isolate 파일 저장 오류: ${message['error']}');
+        }
+      }
+    });
+
+    _sendPort = await completer.future;
+  }
+
+  bool saveFrame(String filePath, Uint8List imageData) {
+    if (_sendPort == null) return false;
+
+    _sendPort!.send({
+      'action': 'save',
+      'filePath': filePath,
+      'imageData': imageData,
+    });
+
+    _pendingWrites++;
+    return true;
+  }
+
+  void stop() {
+    if (_sendPort != null) {
+      _sendPort!.send({'action': 'stop'});
+    }
+    _isolate?.kill();
+    _receivePort?.close();
+
+    _isolate = null;
+    _sendPort = null;
+    _receivePort = null;
+    _pendingWrites = 0;
   }
 }
