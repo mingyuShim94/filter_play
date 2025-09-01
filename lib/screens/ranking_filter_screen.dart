@@ -86,6 +86,8 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
   InterstitialAd? _interstitialAd;
   bool _isAdLoaded = false;
   String? _pendingVideoPath;
+  VideoProcessingResult? _pendingProcessingResult;
+  String? _pendingOriginalVideoPath;
 
   @override
   void initState() {
@@ -118,7 +120,14 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
           _interstitialAd!.fullScreenContentCallback =
               FullScreenContentCallback(
             onAdShowedFullScreenContent: (ad) {
-              print('📺 전면 광고 표시됨');
+              print('📺 전면 광고 표시됨 - 영상 처리 시작');
+              // 광고가 표시되는 즉시 영상 처리 시작
+              if (_pendingVideoPath != null) {
+                setState(() {
+                  _isProcessing = true;
+                });
+                _processVideoAfterAd(_pendingVideoPath!);
+              }
             },
             onAdFailedToShowFullScreenContent: (ad, err) {
               print('📺 전면 광고 표시 실패: $err');
@@ -127,6 +136,9 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
               _isAdLoaded = false;
               // 광고 실패 시에도 비디오 처리 진행
               if (_pendingVideoPath != null) {
+                setState(() {
+                  _isProcessing = true;
+                });
                 _processVideoAfterAd(_pendingVideoPath!);
               }
             },
@@ -135,9 +147,9 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
               ad.dispose();
               _interstitialAd = null;
               _isAdLoaded = false;
-              // 광고 종료 후 비디오 처리 시작
-              if (_pendingVideoPath != null) {
-                _processVideoAfterAd(_pendingVideoPath!);
+              // 광고 종료 시점에 영상 처리가 완료되었으면 결과 화면으로 이동
+              if (!_isProcessing && _pendingProcessingResult != null) {
+                _navigateToResult();
               }
             },
           );
@@ -150,20 +162,80 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
     );
   }
 
-  // 광고 종료 후 비디오 처리 시작
+  // 광고 표시 후 비디오 처리 시작
   void _processVideoAfterAd(String originalVideoPath) async {
     _pendingVideoPath = null;
+    _pendingOriginalVideoPath = originalVideoPath;
 
     // 재시도 카운터 초기화
     _processingRetryCount = 0;
 
     // 재시도 로직이 포함된 비디오 처리 시작
-    await _processVideoWithRetry(originalVideoPath);
+    final processingResult = await _processVideoWithRetry(originalVideoPath);
 
-    // 처리 완료 후 상태 업데이트
-    setState(() {
-      _isProcessing = false;
-    });
+    // 처리 결과 저장
+    _pendingProcessingResult = processingResult;
+
+    // 처리 완료 후 상태 업데이트 및 결과 화면으로 이동
+    if (mounted) {
+      setState(() {
+        _isProcessing = false;
+      });
+
+      // 광고가 아직 표시 중이면 결과 화면 이동을 대기
+      // 광고가 이미 종료되었으면 즉시 결과 화면으로 이동
+      _navigateToResultIfReady();
+    }
+  }
+
+  // 영상 처리 완료 후 결과 화면 이동 여부 결정
+  void _navigateToResultIfReady() {
+    // 광고가 표시 중이 아니면 즉시 결과 화면으로 이동
+    if (!_isAdLoaded || _interstitialAd == null) {
+      // 광고가 없거나 이미 종료된 상태
+      _navigateToResult();
+    }
+    // 광고가 표시 중이면 onAdDismissedFullScreenContent에서 이동 처리
+  }
+
+  // 실제 결과 화면 이동 로직
+  void _navigateToResult() {
+    if (!mounted ||
+        _pendingProcessingResult == null ||
+        _pendingOriginalVideoPath == null) {
+      return;
+    }
+
+    final processingResult = _pendingProcessingResult!;
+    final originalVideoPath = _pendingOriginalVideoPath!;
+
+    // 처리 성공 시
+    if (processingResult.success && processingResult.outputPath != null) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (context) => ResultScreen(
+            videoPath: processingResult.outputPath,
+            isOriginalVideo: false,
+            originalVideoPath: originalVideoPath,
+          ),
+        ),
+      );
+    } else {
+      // 처리 실패 시
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (context) => ResultScreen(
+            videoPath: null,
+            processingError: processingResult.error,
+            originalVideoPath: originalVideoPath,
+          ),
+        ),
+      );
+    }
+
+    // 저장된 데이터 초기화
+    _pendingProcessingResult = null;
+    _pendingOriginalVideoPath = null;
   }
 
   // 랭킹 게임 초기화
@@ -471,7 +543,8 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
   }
 
   // 비디오 처리를 재시도하는 메서드
-  Future<void> _processVideoWithRetry(String originalVideoPath) async {
+  Future<VideoProcessingResult?> _processVideoWithRetry(
+      String originalVideoPath) async {
     for (int attempt = 1; attempt <= _maxProcessingRetries; attempt++) {
       _processingRetryCount = attempt;
 
@@ -524,7 +597,7 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
         // 처리 성공 시
         if (processingResult.success) {
           await _handleProcessingSuccess(processingResult, originalVideoPath);
-          return; // 성공 시 재시도 루프 종료
+          return processingResult; // 성공 시 재시도 루프 종료
         } else {
           // 처리 실패 시
           if (attempt < _maxProcessingRetries) {
@@ -539,7 +612,7 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
           } else {
             // 최대 재시도 횟수 초과
             await _handleProcessingFailure(processingResult, originalVideoPath);
-            return;
+            return processingResult;
           }
         }
       } catch (e) {
@@ -554,10 +627,24 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
         } else {
           // 최대 재시도 횟수 초과하여 예외 발생
           await _handleProcessingException(e, originalVideoPath);
-          return;
+          return VideoProcessingResult(
+            success: false,
+            error: VideoProcessingError(
+              message: '영상 처리 중 예외 발생: $e',
+              inputPath: originalVideoPath,
+              outputPath: null,
+              ffmpegCommand: 'N/A',
+              logs: ['최대 재시도 횟수 초과'],
+              fileInfo: {},
+              timestamp: DateTime.now(),
+            ),
+          );
         }
       }
     }
+
+    // 모든 재시도가 실패한 경우
+    return null;
   }
 
   // 처리 성공 시 처리 로직
@@ -587,20 +674,8 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
         );
       }
 
-      // 잠시 대기 후 결과 화면으로 이동
+      // 잠시 대기 (결과 화면 이동은 광고 종료 후 처리)
       await Future.delayed(const Duration(milliseconds: 300));
-
-      if (mounted) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (context) => ResultScreen(
-              videoPath: processingResult.outputPath,
-              isOriginalVideo: false,
-              originalVideoPath: originalVideoPath,
-            ),
-          ),
-        );
-      }
     } else {
       // VideoPlayer 검증 실패
       await _handleVideoValidationFailure(processingResult, originalVideoPath);

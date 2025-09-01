@@ -16,6 +16,20 @@ void main() {
   // Google 모바일 광고 SDK 초기화
   MobileAds.instance.initialize();
 
+  // 디버그 모드에서 테스트 기기 설정
+  if (kDebugMode) {
+    // 테스트 기기 ID는 앱 실행 후 로그에서 확인 가능
+    // Android logcat 출력: "Use RequestConfiguration.Builder.setTestDeviceIds..."
+    // 실제 기기 ID로 교체 필요
+    MobileAds.instance.updateRequestConfiguration(
+      RequestConfiguration(
+        testDeviceIds: [
+          // '33BE2250B43518CCDA7DE426D04EE231', // 예시 - 실제 기기 ID로 교체
+        ],
+      ),
+    );
+  }
+
   // Flutter Zone을 사용하여 print 출력 필터링
   runZoned(() {
     runApp(
