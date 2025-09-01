@@ -830,15 +830,11 @@ class _GallerySaveButtonsState extends State<_GallerySaveButtons> {
         });
 
         if (result.success) {
-          // 성공 스낵바 및 갤러리 열기 옵션
+          // 성공 스낵바
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('Camera video saved to gallery! ✅'),
-              action: SnackBarAction(
-                label: 'Open Gallery',
-                onPressed: () => GalleryService.openGallery(),
-              ),
-              duration: const Duration(seconds: 3),
+            const SnackBar(
+              content: Text('Camera video saved to gallery! ✅'),
+              duration: Duration(seconds: 3),
             ),
           );
         } else {
