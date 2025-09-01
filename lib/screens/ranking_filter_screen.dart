@@ -70,6 +70,9 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
   double _screenWidth = 0;
   double _screenHeight = 0;
 
+  // 상태바 높이 저장
+  double _statusBarHeight = 0;
+
   // 크롭 영역 시각화 관련
   bool _showCropArea = false;
 
@@ -417,6 +420,7 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
           cameraHeight: _cameraHeight,
           leftOffset: _leftOffset,
           topOffset: _topOffset,
+          statusBarHeight: _statusBarHeight,
           progressCallback: (progress) {
             if (mounted) {
               final progressPercent = (progress * 100).toInt();
@@ -819,6 +823,9 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // SafeArea 밖에서 상태바 높이 가져오기
+    final fullScreenStatusBarHeight = MediaQuery.of(context).viewPadding.top;
+
     return Scaffold(
       body: SafeArea(
         child: _initializeControllerFuture == null
@@ -880,6 +887,8 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
 
                       // 카메라 영역 중앙 배치를 위한 오프셋
                       final leftOffset = (screenWidth - cameraWidth) / 2;
+                      final statusBarHeight = fullScreenStatusBarHeight;
+
                       final topOffset = (screenHeight - 150 - cameraHeight) / 2;
 
                       // 카메라 영역 정보 저장 (비디오 처리에서 사용)
@@ -888,7 +897,8 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
                       _cameraWidth = cameraWidth;
                       _cameraHeight = cameraHeight;
                       _leftOffset = leftOffset;
-                      _topOffset = topOffset;
+                      _topOffset = topOffset + statusBarHeight; // 녹화 크롭용
+                      _statusBarHeight = statusBarHeight;
 
                       return Stack(
                         fit: StackFit.expand,
@@ -1205,6 +1215,11 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
                                       '오프셋: (${leftOffset.toInt()}, ${topOffset.toInt()})',
                                       style: TextStyle(
                                           color: Colors.white, fontSize: 12),
+                                    ),
+                                    Text(
+                                      '상태바 높이: ${fullScreenStatusBarHeight.toInt()}px',
+                                      style: TextStyle(
+                                          color: Colors.orange, fontSize: 12),
                                     ),
                                     const SizedBox(height: 4),
                                     Text(

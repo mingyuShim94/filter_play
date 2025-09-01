@@ -318,6 +318,7 @@ class VideoProcessingService {
   /// [cameraHeight] Flutter 카메라 영역 높이 (픽셀)
   /// [leftOffset] Flutter 카메라 영역 왼쪽 오프셋 (픽셀)
   /// [topOffset] Flutter 카메라 영역 상단 오프셋 (픽셀)
+  /// [statusBarHeight] 상태바 높이 (픽셀)
   /// [progressCallback] 진행률 콜백 (선택적)
   ///
   /// Returns [VideoProcessingResult] 처리 결과
@@ -329,6 +330,7 @@ class VideoProcessingService {
     required double cameraHeight,
     required double leftOffset,
     required double topOffset,
+    required double statusBarHeight,
     Function(double progress)? progressCallback,
   }) async {
     final logs = <String>[];
@@ -392,19 +394,22 @@ class VideoProcessingService {
       // 비율 기반 크롭 파라미터 계산
       // crop=width:height:x:y 형식
       // Flutter 좌표를 비디오 해상도 비율로 변환
+      // 실제 녹화되는 전체 화면 높이 = screenHeight + statusBarHeight
+      final fullScreenHeight = screenHeight + statusBarHeight;
+
       final cropWidth =
           'trunc(iw*${(cameraWidth / screenWidth).toStringAsFixed(6)})';
       final cropHeight =
-          'trunc(ih*${(cameraHeight / screenHeight).toStringAsFixed(6)})';
+          'trunc(ih*${(cameraHeight / fullScreenHeight).toStringAsFixed(6)})';
       final cropX =
           'trunc(iw*${(leftOffset / screenWidth).toStringAsFixed(6)})';
       final cropY =
-          'trunc(ih*${(topOffset / screenHeight).toStringAsFixed(6)})';
+          'trunc(ih*${(topOffset / fullScreenHeight).toStringAsFixed(6)})';
 
       // 플랫폼별 하드웨어 가속 인코더 선택
       String videoEncoder;
       String encoderType;
-      
+
       if (Platform.isIOS) {
         videoEncoder = "h264_videotoolbox";
         encoderType = "iOS VideoToolbox 하드웨어 가속";
@@ -431,11 +436,13 @@ class VideoProcessingService {
       logs.add(
           '   Width: $cropWidth (${(cameraWidth / screenWidth * 100).toStringAsFixed(1)}%)');
       logs.add(
-          '   Height: $cropHeight (${(cameraHeight / screenHeight * 100).toStringAsFixed(1)}%)');
+          '   Height: $cropHeight (${(cameraHeight / fullScreenHeight * 100).toStringAsFixed(1)}%)');
       logs.add(
           '   X: $cropX (${(leftOffset / screenWidth * 100).toStringAsFixed(1)}%)');
       logs.add(
-          '   Y: $cropY (${(topOffset / screenHeight * 100).toStringAsFixed(1)}%)');
+          '   Y: $cropY (${(topOffset / fullScreenHeight * 100).toStringAsFixed(1)}%)');
+      logs.add(
+          '   전체 화면 높이: ${fullScreenHeight.toInt()}px (SafeArea: ${screenHeight.toInt()}px + 상태바: ${statusBarHeight.toInt()}px)');
       logs.add('');
 
       logs.add('⚙️ FFmpeg 명령어: $command');
@@ -591,7 +598,8 @@ class VideoProcessingService {
           detailedMessage +=
               ' [해상도 오류: 가로/세로 크기가 2로 나누어지지 않음 - Android 호환성 문제]';
         } else if (hasHardwareEncoderError) {
-          detailedMessage += ' [하드웨어 인코더 오류: 기기에서 하드웨어 가속을 지원하지 않음 - CPU 인코더로 재시도 필요]';
+          detailedMessage +=
+              ' [하드웨어 인코더 오류: 기기에서 하드웨어 가속을 지원하지 않음 - CPU 인코더로 재시도 필요]';
         } else if (hasCodecError) {
           detailedMessage += ' [코덱 오류: H.264 인코딩 문제 - ExoPlayer 호환성 이슈]';
         } else if (hasCropError) {
