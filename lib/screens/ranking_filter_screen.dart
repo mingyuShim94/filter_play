@@ -1285,34 +1285,6 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
                               ),
                             ),
 
-                          // 크롭 영역 토글 버튼 (녹화 중이거나 처리 중이 아닐 때만 표시)
-                          if (!_isRecording && !_isProcessing)
-                            Positioned(
-                              top: 16,
-                              right: cameras.length > 1 ? 72 : 16,
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: Colors.black.withValues(alpha: 0.5),
-                                  borderRadius: BorderRadius.circular(24),
-                                ),
-                                child: IconButton(
-                                  onPressed: () {
-                                    setState(() {
-                                      _showCropArea = !_showCropArea;
-                                    });
-                                  },
-                                  icon: Icon(
-                                    _showCropArea
-                                        ? Icons.crop_free
-                                        : Icons.crop,
-                                  ),
-                                  color:
-                                      _showCropArea ? Colors.red : Colors.white,
-                                  iconSize: 24,
-                                ),
-                              ),
-                            ),
-
                           // 크롭 영역 시각화 (빨간 사각형)
                           if (_showCropArea)
                             Positioned(
