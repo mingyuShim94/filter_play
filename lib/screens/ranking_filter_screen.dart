@@ -58,7 +58,7 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
   // 녹화 관련 상태 변수들 (flutter_screen_recording용)
   bool _isRecording = false;
   bool _isProcessing = false;
-  String _statusText = '녹화 준비됨';
+  String _statusText = 'Ready to Record';
 
   // 녹화 시간 관련 변수들
   Timer? _recordingTimer;
@@ -112,7 +112,7 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
       request: const AdRequest(),
       adLoadCallback: InterstitialAdLoadCallback(
         onAdLoaded: (InterstitialAd ad) {
-          print('📺 전면 광고 로드 성공');
+          print('📺 Interstitial ad loaded successfully');
           _interstitialAd = ad;
           _isAdLoaded = true;
 
@@ -120,7 +120,7 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
           _interstitialAd!.fullScreenContentCallback =
               FullScreenContentCallback(
             onAdShowedFullScreenContent: (ad) {
-              print('📺 전면 광고 표시됨 - 영상 처리 시작');
+              print('📺 Interstitial ad shown - starting video processing');
               // 광고가 표시되는 즉시 영상 처리 시작
               if (_pendingVideoPath != null) {
                 setState(() {
@@ -130,7 +130,7 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
               }
             },
             onAdFailedToShowFullScreenContent: (ad, err) {
-              print('📺 전면 광고 표시 실패: $err');
+              print('📺 Interstitial ad show failed: $err');
               ad.dispose();
               _interstitialAd = null;
               _isAdLoaded = false;
@@ -143,7 +143,7 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
               }
             },
             onAdDismissedFullScreenContent: (ad) {
-              print('📺 전면 광고 종료됨');
+              print('📺 Interstitial ad dismissed');
               ad.dispose();
               _interstitialAd = null;
               _isAdLoaded = false;
@@ -155,7 +155,7 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
           );
         },
         onAdFailedToLoad: (LoadAdError error) {
-          print('📺 전면 광고 로드 실패: $error');
+          print('📺 Interstitial ad load failed: $error');
           _isAdLoaded = false;
         },
       ),
@@ -241,26 +241,28 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
   // 랭킹 게임 초기화
   void _initializeRankingGame() async {
     print('🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮');
-    print('🎮🔥 랭킹 게임 초기화 시작');
+    print('🎮🔥 Starting ranking game initialization');
     print('🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮🎮');
 
     // 현재 선택된 필터 정보 가져오기
     final selectedFilter = ref.read(selectedFilterProvider);
 
     if (selectedFilter != null) {
-      print('🎮✅ 선택된 필터: ${selectedFilter.id} (${selectedFilter.name})');
+      print(
+          '🎮✅ Selected filter: ${selectedFilter.id} (${selectedFilter.name})');
 
       // 선택된 필터의 캐릭터 데이터 로드
       final characters =
           await RankingDataService.getCharactersByGameId(selectedFilter.id);
 
       if (characters.isNotEmpty) {
-        print('🎮🎯 캐릭터 로드 성공: ${characters.length}개');
+        print(
+            '🎮🎯 Characters loaded successfully: ${characters.length} items');
         ref
             .read(rankingGameProvider.notifier)
             .startGame(selectedFilter.id, characters);
       } else {
-        print('🎮⚠️ 캐릭터 데이터가 없음, 기본값 사용');
+        print('🎮⚠️ No character data found, using defaults');
         // 기본값으로 폴백
         final defaultCharacters =
             await RankingDataService.getKpopDemonHuntersCharacters();
@@ -269,7 +271,7 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
             .startGame('all_characters', defaultCharacters);
       }
     } else {
-      print('🎮❌ 선택된 필터가 없음, 기본값 사용');
+      print('🎮❌ No filter selected, using defaults');
       // 선택된 필터가 없으면 기본값 사용
       final defaultCharacters =
           await RankingDataService.getKpopDemonHuntersCharacters();
@@ -278,7 +280,7 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
           .startGame('all_characters', defaultCharacters);
     }
 
-    print('🎮🎉 랭킹 게임 초기화 완료');
+    print('🎮🎉 Ranking game initialization complete');
   }
 
   @override
@@ -341,7 +343,7 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
       if (!micPermission.isGranted) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('마이크 권한이 필요합니다')),
+            const SnackBar(content: Text('Microphone permission required')),
           );
         }
         return false;
@@ -351,7 +353,7 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('권한 확인 오류: $e')),
+          SnackBar(content: Text('Permission check error: $e')),
         );
       }
       return false;
@@ -551,9 +553,10 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
       try {
         setState(() {
           if (attempt == 1) {
-            _statusText = '🎬 고화질 영상 처리 중... (30-60초 소요)';
+            _statusText = '🎬 Processing HD video... (30-60 seconds)';
           } else {
-            _statusText = '🔄 영상 처리 재시도 중... ($attempt/$_maxProcessingRetries)';
+            _statusText =
+                '🔄 Retrying video processing... ($attempt/$_maxProcessingRetries)';
           }
         });
 
@@ -575,16 +578,16 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
 
               if (progressPercent < 30) {
                 statusMessage = attempt == 1
-                    ? '🎬 영상 분석 중... $progressPercent%'
-                    : '🔄 영상 분석 재시도... $progressPercent% ($attempt/$_maxProcessingRetries)';
+                    ? '🎬 Analyzing video... $progressPercent%'
+                    : '🔄 Retrying video analysis... $progressPercent% ($attempt/$_maxProcessingRetries)';
               } else if (progressPercent < 80) {
                 statusMessage = attempt == 1
-                    ? '✂️ 카메라 영역 추출 중... $progressPercent%'
-                    : '🔄 영역 추출 재시도... $progressPercent% ($attempt/$_maxProcessingRetries)';
+                    ? '✂️ Extracting camera area... $progressPercent%'
+                    : '🔄 Retrying area extraction... $progressPercent% ($attempt/$_maxProcessingRetries)';
               } else {
                 statusMessage = attempt == 1
-                    ? '🔧 최종 처리 중... $progressPercent%'
-                    : '🔄 최종 처리 재시도... $progressPercent% ($attempt/$_maxProcessingRetries)';
+                    ? '🔧 Final processing... $progressPercent%'
+                    : '🔄 Retrying final processing... $progressPercent% ($attempt/$_maxProcessingRetries)';
               }
 
               setState(() {
@@ -604,7 +607,7 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
             // 재시도 전 대기
             setState(() {
               _statusText =
-                  '⏳ 잠시 후 자동 재시도... (${attempt + 1}/$_maxProcessingRetries)';
+                  '⏳ Auto retry shortly... (${attempt + 1}/$_maxProcessingRetries)';
             });
             await Future.delayed(
                 Duration(seconds: 2 + attempt)); // 점진적으로 대기 시간 증가
@@ -616,11 +619,11 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
           }
         }
       } catch (e) {
-        print('❌ 비디오 처리 시도 $attempt 실패: $e');
+        print('❌ Video processing attempt $attempt failed: $e');
         if (attempt < _maxProcessingRetries) {
           setState(() {
             _statusText =
-                '❌ 처리 오류 발생, 자동 재시도 중... (${attempt + 1}/$_maxProcessingRetries)';
+                '❌ Processing error occurred, auto retrying... (${attempt + 1}/$_maxProcessingRetries)';
           });
           await Future.delayed(Duration(seconds: 3 + attempt));
           continue;
@@ -630,11 +633,11 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
           return VideoProcessingResult(
             success: false,
             error: VideoProcessingError(
-              message: '영상 처리 중 예외 발생: $e',
+              message: 'Exception occurred during video processing: $e',
               inputPath: originalVideoPath,
               outputPath: null,
               ffmpegCommand: 'N/A',
-              logs: ['최대 재시도 횟수 초과'],
+              logs: ['Maximum retry count exceeded'],
               fileInfo: {},
               timestamp: DateTime.now(),
             ),
@@ -651,7 +654,7 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
   Future<void> _handleProcessingSuccess(
       VideoProcessingResult processingResult, String originalVideoPath) async {
     setState(() {
-      _statusText = '✅ 고화질 영상 처리 완료!';
+      _statusText = '✅ HD video processing complete!';
     });
 
     // VideoPlayer 준비 상태 검증
@@ -659,7 +662,7 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
 
     if (videoReady) {
       setState(() {
-        _statusText = '🎉 영상 준비 완료!';
+        _statusText = '🎉 Video ready!';
       });
 
       // 성공 메시지 표시
@@ -667,8 +670,8 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(_processingRetryCount > 1
-                ? '고화질 영상이 준비되었습니다 (재시도 성공)'
-                : '고화질 영상이 준비되었습니다'),
+                ? 'HD video is ready (retry successful)'
+                : 'HD video is ready'),
             duration: Duration(seconds: 2),
           ),
         );
@@ -686,14 +689,15 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
   Future<void> _handleProcessingFailure(
       VideoProcessingResult processingResult, String originalVideoPath) async {
     setState(() {
-      _statusText = '❌ 영상 처리 최종 실패 ($_maxProcessingRetries회 시도)';
+      _statusText =
+          '❌ Video processing final failure ($_maxProcessingRetries attempts)';
     });
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content:
-              Text('영상 처리에 $_maxProcessingRetries회 실패했습니다. 에러 정보를 확인해주세요.'),
+          content: Text(
+              'Video processing failed $_maxProcessingRetries times. Please check error information.'),
           duration: Duration(seconds: 3),
         ),
       );
@@ -716,13 +720,13 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
   Future<void> _handleVideoValidationFailure(
       VideoProcessingResult processingResult, String originalVideoPath) async {
     setState(() {
-      _statusText = '❌ 영상 준비 검증 실패';
+      _statusText = '❌ Video preparation validation failed';
     });
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('영상 준비에 실패했습니다.'),
+          content: Text('Video preparation failed.'),
           duration: Duration(seconds: 3),
         ),
       );
@@ -732,11 +736,12 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
           builder: (context) => ResultScreen(
             videoPath: null,
             processingError: VideoProcessingError(
-              message: '영상 준비 검증 실패: VideoPlayer 호환성 문제',
+              message:
+                  'Video preparation validation failed: VideoPlayer compatibility issue',
               inputPath: originalVideoPath,
               outputPath: processingResult.outputPath,
               ffmpegCommand: 'N/A',
-              logs: ['영상 파일은 생성되었으나 VideoPlayer에서 재생할 수 없는 상태'],
+              logs: ['Video file created but cannot be played by VideoPlayer'],
               fileInfo: {},
               timestamp: DateTime.now(),
             ),
@@ -751,13 +756,13 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
   Future<void> _handleProcessingException(
       dynamic error, String originalVideoPath) async {
     setState(() {
-      _statusText = '❌ 영상 처리 중 오류 발생';
+      _statusText = '❌ Error occurred during video processing';
     });
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('영상 처리 중 오류가 발생했습니다: $error'),
+          content: Text('Error occurred during video processing: $error'),
           duration: Duration(seconds: 3),
         ),
       );
@@ -767,11 +772,11 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
           builder: (context) => ResultScreen(
             videoPath: null,
             processingError: VideoProcessingError(
-              message: '영상 처리 중 예외 발생: $error',
+              message: 'Exception occurred during video processing: $error',
               inputPath: originalVideoPath,
               outputPath: null,
               ffmpegCommand: 'N/A',
-              logs: ['예외 발생으로 처리 중단'],
+              logs: ['Processing stopped due to exception'],
               fileInfo: {},
               timestamp: DateTime.now(),
             ),
@@ -786,7 +791,7 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
   Future<bool> _validateVideoReady(String videoPath) async {
     try {
       setState(() {
-        _statusText = '🎬 영상 준비 완료 확인 중...';
+        _statusText = '🎬 Checking video ready status...';
       });
 
       // 파일 존재 및 크기 확인
@@ -798,7 +803,7 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
       for (int attempt = 1; attempt <= 20; attempt++) {
         setState(() {
           _statusText =
-              '📁 영상 파일 안정화 대기 중... (${(attempt * 0.5).toInt()}초/10초)';
+              '📁 Waiting for video file stabilization... (${(attempt * 0.5).toInt()}s/10s)';
         });
 
         if (await videoFile.exists()) {
@@ -816,12 +821,13 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
       }
 
       if (!fileExists || fileSize < 1000) {
-        print('❌ 비디오 파일 검증 실패: 존재=$fileExists, 크기=${fileSize}B');
+        print(
+            '❌ Video file validation failed: exists=$fileExists, size=${fileSize}B');
         return false;
       }
 
       setState(() {
-        _statusText = '🔧 비디오 플레이어 호환성 확인 중...';
+        _statusText = '🔧 Checking video player compatibility...';
       });
 
       // VideoPlayerController로 실제 초기화 테스트 (재시도 로직 포함)
@@ -833,8 +839,8 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
         try {
           setState(() {
             _statusText = testAttempt == 1
-                ? '🔧 비디오 플레이어 호환성 확인 중...'
-                : '🔄 비디오 플레이어 재확인 중... ($testAttempt/5)';
+                ? '🔧 Checking video player compatibility...'
+                : '🔄 Rechecking video player... ($testAttempt/5)';
           });
 
           // 이전 테스트 컨트롤러가 있으면 정리
@@ -845,11 +851,13 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
 
           if (testController.value.isInitialized) {
             canInitialize = true;
-            print('✅ VideoPlayer 초기화 테스트 성공 (시도: $testAttempt/5)');
+            print(
+                '✅ VideoPlayer initialization test successful (attempt: $testAttempt/5)');
             break; // 성공하면 재시도 루프 종료
           }
         } catch (e) {
-          print('❌ VideoPlayer 초기화 테스트 실패 (시도: $testAttempt/5): $e');
+          print(
+              '❌ VideoPlayer initialization test failed (attempt: $testAttempt/5): $e');
 
           if (testAttempt < 5) {
             // 재시도 전 대기 시간 (점진적으로 증가)
@@ -867,7 +875,7 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
 
       return canInitialize;
     } catch (e) {
-      print('❌ 비디오 검증 중 오류: $e');
+      print('❌ Error during video validation: $e');
       return false;
     }
   }
@@ -879,7 +887,7 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
 
     setState(() {
       _isRecording = true;
-      _statusText = '녹화 중...';
+      _statusText = 'Recording...';
     });
 
     try {
@@ -887,17 +895,17 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
       bool started = await FlutterScreenRecording.startRecordScreenAndAudio(
         "FilterPlay_Recording_${DateTime.now().millisecondsSinceEpoch}",
         titleNotification: "FilterPlay",
-        messageNotification: "화면 녹화 중...",
+        messageNotification: "Recording screen...",
       );
 
       if (!started) {
         setState(() {
           _isRecording = false;
-          _statusText = '녹화 시작 실패';
+          _statusText = 'Recording start failed';
         });
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('화면 녹화를 시작할 수 없습니다')),
+            const SnackBar(content: Text('Cannot start screen recording')),
           );
         }
       } else {
@@ -907,11 +915,11 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
     } catch (e) {
       setState(() {
         _isRecording = false;
-        _statusText = '녹화 시작 실패: $e';
+        _statusText = 'Recording start failed: $e';
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('녹화 시작 오류: $e')),
+          SnackBar(content: Text('Recording start error: $e')),
         );
       }
     }
@@ -924,7 +932,7 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
 
     setState(() {
       _isRecording = false;
-      _statusText = '녹화 완료 중...';
+      _statusText = 'Finishing recording...';
     });
 
     try {
@@ -938,12 +946,12 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
         // 광고가 로드되어 있으면 표시, 아니면 바로 비디오 처리
         if (_isAdLoaded && _interstitialAd != null) {
           setState(() {
-            _statusText = '📺 광고 준비 중...';
+            _statusText = '📺 Preparing ad...';
           });
           _interstitialAd!.show();
         } else {
           // 광고가 없으면 바로 비디오 처리 시작
-          print('📺 광고 미로드 상태, 바로 비디오 처리 시작');
+          print('📺 Ad not loaded, starting video processing directly');
           setState(() {
             _isProcessing = true;
           });
@@ -952,17 +960,17 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
       } else {
         setState(() {
           _isProcessing = false;
-          _statusText = '녹화된 동영상을 찾을 수 없습니다';
+          _statusText = 'Cannot find recorded video';
         });
       }
     } catch (e) {
       setState(() {
         _isProcessing = false;
-        _statusText = '녹화 중지 실패: $e';
+        _statusText = 'Recording stop failed: $e';
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('녹화 중지 오류: $e')),
+          SnackBar(content: Text('Recording stop error: $e')),
         );
       }
     }
@@ -993,15 +1001,15 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
                     Text(
                       _permissionRequested
                           ? (_permissionGranted
-                              ? "카메라 초기화 중..."
-                              : "카메라 권한이 필요합니다")
-                          : "카메라 권한 요청 중...",
+                              ? "Initializing camera..."
+                              : "Camera permission required")
+                          : "Requesting camera permission...",
                       style: const TextStyle(fontSize: 16),
                     ),
                     if (_permissionRequested && !_permissionGranted) ...const [
                       SizedBox(height: 8),
                       Text(
-                        "설정에서 카메라 권한을 허용해주세요",
+                        "Please allow camera permission in settings",
                         style: TextStyle(fontSize: 12, color: Colors.grey),
                       ),
                     ],
@@ -1173,7 +1181,7 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
                                       ),
                                       const SizedBox(height: 8),
                                       const Text(
-                                        '잠시만 기다려주세요',
+                                        'Please wait a moment',
                                         style: TextStyle(
                                           color: Colors.white70,
                                           fontSize: 12,
@@ -1340,7 +1348,7 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      '🎯 크롭 영역 정보',
+                                      '🎯 Crop Area Info',
                                       style: TextStyle(
                                         color: Colors.red,
                                         fontSize: 14,
@@ -1349,28 +1357,28 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
                                     ),
                                     const SizedBox(height: 8),
                                     Text(
-                                      '화면 크기: ${screenWidth.toInt()}×${screenHeight.toInt()}',
+                                      'Screen Size: ${screenWidth.toInt()}×${screenHeight.toInt()}',
                                       style: TextStyle(
                                           color: Colors.white, fontSize: 12),
                                     ),
                                     Text(
-                                      '카메라 영역: ${cameraWidth.toInt()}×${cameraHeight.toInt()}',
+                                      'Camera Area: ${cameraWidth.toInt()}×${cameraHeight.toInt()}',
                                       style: TextStyle(
                                           color: Colors.white, fontSize: 12),
                                     ),
                                     Text(
-                                      '오프셋: (${leftOffset.toInt()}, ${topOffset.toInt()})',
+                                      'Offset: (${leftOffset.toInt()}, ${topOffset.toInt()})',
                                       style: TextStyle(
                                           color: Colors.white, fontSize: 12),
                                     ),
                                     Text(
-                                      '상태바 높이: ${fullScreenStatusBarHeight.toInt()}px',
+                                      'Status Bar Height: ${fullScreenStatusBarHeight.toInt()}px',
                                       style: TextStyle(
                                           color: Colors.orange, fontSize: 12),
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      '크롭 비율:',
+                                      'Crop Ratio:',
                                       style: TextStyle(
                                           color: Colors.yellow, fontSize: 12),
                                     ),
