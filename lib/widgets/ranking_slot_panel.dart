@@ -17,21 +17,19 @@ class RankingSlotPanel extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // 🔥 [최적화] 전체 리스트 대신 길이만 watch하여 리빌드 최소화
     final itemCount =
         ref.watch(rankingSlotsProvider.select((slots) => slots.length));
-    final actualItemCount = itemCount > 0 ? itemCount : 10; // 초기 상태 고려
+    final actualItemCount = itemCount > 0 ? itemCount : 10;
 
     return SizedBox(
-      width: 96, // 120에서 20% 감소 (120 * 0.8 = 96)
+      width: 96,
       child: Column(
-        mainAxisSize: MainAxisSize.min, // 컨텐츠 크기에 맞춤
+        mainAxisSize: MainAxisSize.min,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // 랭킹 슬롯들
           ListView.builder(
-            shrinkWrap: true, // ListView가 컨텐츠 크기에 맞춤
-            physics: const NeverScrollableScrollPhysics(), // 스크롤 비활성화
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
             padding: const EdgeInsets.symmetric(horizontal: 8),
             itemCount: actualItemCount,
             itemBuilder: (context, index) {
@@ -39,9 +37,9 @@ class RankingSlotPanel extends ConsumerWidget {
                 padding: const EdgeInsets.only(bottom: 6),
                 child: Center(
                   child: RankingSlotWidget(
-                    key: ValueKey('slot_$index'), // 키 간소화
+                    key: ValueKey('slot_$index'),
                     rank: index + 1,
-                    onSlotTap: onSlotTap, // 콜백 전달
+                    onSlotTap: onSlotTap,
                   ),
                 ),
               );
@@ -55,28 +53,50 @@ class RankingSlotPanel extends ConsumerWidget {
 
 class RankingSlotWidget extends ConsumerWidget {
   final int rank;
-  // final RankingItem? item; // 🔥 [제거] 더 이상 부모로부터 item을 받지 않음
-  final VoidCallback? onSlotTap; // 🔥 [수정] onSlotTap 콜백을 받도록 변경
+  final VoidCallback? onSlotTap;
 
-  // 이미지 정보 캐시 (깜빡임 방지)
   static final Map<String, ui.Image> _imageInfoCache = {};
   static final Map<String, bool> _imageIsPortraitCache = {};
+  static final Map<String, Widget> _preloadedImageWidgetCache = {};
+  static final Set<String> _loadingImages = {};
+  
+  static const Duration _animationDuration = Duration(milliseconds: 300);
+  static const double _containerWidth = 43.0;
+  static const double _containerHeight = 43.0;
+  static const BorderRadius _containerBorderRadius = BorderRadius.all(Radius.circular(12));
+  static const BorderRadius _imageBorderRadius = BorderRadius.all(Radius.circular(10));
+  
+  static const TextStyle _rankTextStyle = TextStyle(
+    color: Colors.white,
+    fontSize: 14,
+    fontWeight: FontWeight.bold,
+  );
+  
+  static const TextStyle _itemNameTextStyle = TextStyle(
+    color: Colors.white,
+    fontSize: 8,
+    fontWeight: FontWeight.bold,
+    shadows: [
+      Shadow(
+        offset: Offset(0.4, 0.4),
+        blurRadius: 0.8,
+        color: Colors.black,
+      ),
+    ],
+  );
 
   const RankingSlotWidget({
     super.key,
     required this.rank,
-    this.onSlotTap, // 🔥 [추가]
+    this.onSlotTap,
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // 🔥 [수정] 여기서 `select`를 사용하여 해당 인덱스의 아이템만 watch 합니다.
-    // 이렇게 하면 다른 슬롯이 변경되어도 이 위젯은 리빌드되지 않습니다.
     final item = ref.watch(rankingSlotsProvider
         .select((slots) => slots.length > rank - 1 ? slots[rank - 1] : null));
     final isEmpty = item == null;
 
-    // 🔥 [수정] onTap과 onLongPress 로직을 위젯 내부로 이동
     onTap() {
       ref.read(rankingGameProvider.notifier).placeItemAtRank(rank - 1);
       onSlotTap?.call();
@@ -97,17 +117,16 @@ class RankingSlotWidget extends ConsumerWidget {
     );
   }
 
-  // 빈 슬롯 레이아웃 - 우측 정렬하여 선택된 슬롯과 이미지 위치 맞춤
   Widget _buildEmptySlotLayout() {
     return SizedBox(
-      width: 73, // 26(숫자) + 4(간격) + 43(이미지)와 동일 (20% 감소)
-      height: 43, // 54에서 20% 감소 (54 * 0.8 = 43.2 ≈ 43)
+      width: 73,
+      height: 43,
       child: Align(
         alignment: Alignment.centerRight,
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 300),
-          width: 43, // 54에서 20% 감소 (54 * 0.8 = 43.2 ≈ 43)
-          height: 43, // 54에서 20% 감소
+          duration: _animationDuration,
+          width: _containerWidth,
+          height: _containerHeight,
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [
@@ -115,10 +134,10 @@ class RankingSlotWidget extends ConsumerWidget {
                 Colors.white.withValues(alpha: 0.2),
               ],
             ),
-            borderRadius: BorderRadius.circular(12), // 15에서 20% 감소 (15 * 0.8 = 12)
+            borderRadius: _containerBorderRadius,
             border: Border.all(
               color: Colors.white.withValues(alpha: 0.5),
-              width: 1.2, // 1.5에서 20% 감소 (1.5 * 0.8 = 1.2)
+              width: 1.2,
             ),
             boxShadow: [
               BoxShadow(
@@ -133,7 +152,7 @@ class RankingSlotWidget extends ConsumerWidget {
               '$rank',
               style: TextStyle(
                 color: Colors.white.withValues(alpha: 0.9),
-                fontSize: 14, // 18에서 20% 감소 (18 * 0.8 = 14.4 ≈ 14)
+                fontSize: 14,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -143,23 +162,21 @@ class RankingSlotWidget extends ConsumerWidget {
     );
   }
 
-  // 선택된 슬롯 레이아웃 - Row로 숫자 영역과 이미지 영역 분리
   Widget _buildSelectedSlotLayout(WidgetRef ref, RankingItem item) {
     final rankColor = _getRankColor(rank);
 
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // 랭킹 숫자 표시 영역
         Container(
-          width: 26, // 32에서 20% 감소 (32 * 0.8 = 25.6 ≈ 26)
-          height: 43, // 54에서 20% 감소 (54 * 0.8 = 43.2 ≈ 43)
+          width: 26,
+          height: 43,
           decoration: BoxDecoration(
             color: rankColor,
-            borderRadius: BorderRadius.circular(12), // 15에서 20% 감소 (15 * 0.8 = 12)
+            borderRadius: _containerBorderRadius,
             border: Border.all(
               color: rankColor,
-              width: 1.6, // 2에서 20% 감소 (2 * 0.8 = 1.6)
+              width: 1.6,
             ),
             boxShadow: [
               BoxShadow(
@@ -172,23 +189,17 @@ class RankingSlotWidget extends ConsumerWidget {
           child: Center(
             child: Text(
               '$rank',
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 14, // 18에서 20% 감소 (18 * 0.8 = 14.4 ≈ 14)
-                fontWeight: FontWeight.bold,
-              ),
+              style: _rankTextStyle,
             ),
           ),
         ),
 
-        const SizedBox(width: 4), // 5에서 20% 감소 (5 * 0.8 = 4)
-
-        // 이미지 슬롯 영역
+        const SizedBox(width: 4),
 
         AnimatedContainer(
-          duration: const Duration(milliseconds: 300),
-          width: 43, // 54에서 20% 감소 (54 * 0.8 = 43.2 ≈ 43)
-          height: 43, // 54에서 20% 감소
+          duration: _animationDuration,
+          width: _containerWidth,
+          height: _containerHeight,
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [
@@ -196,16 +207,16 @@ class RankingSlotWidget extends ConsumerWidget {
                 rankColor.withValues(alpha: 0.6),
               ],
             ),
-            borderRadius: BorderRadius.circular(12), // 15에서 20% 감소 (15 * 0.8 = 12)
+            borderRadius: _containerBorderRadius,
             border: Border.all(
               color: rankColor,
-              width: 1.6, // 2에서 20% 감소 (2 * 0.8 = 1.6)
+              width: 1.6,
             ),
             boxShadow: [
               BoxShadow(
                 color: rankColor.withValues(alpha: 0.3),
-                blurRadius: 3.2, // 4에서 20% 감소 (4 * 0.8 = 3.2)
-                offset: const Offset(0, 1.6), // 2에서 20% 감소 (2 * 0.8 = 1.6)
+                blurRadius: 3.2,
+                offset: const Offset(0, 1.6),
               ),
             ],
           ),
@@ -215,71 +226,52 @@ class RankingSlotWidget extends ConsumerWidget {
     );
   }
 
-  // 선택된 슬롯 UI - 이미지만 표시 (숫자는 별도 영역에서 처리)
   Widget _buildSelectedSlot(WidgetRef ref, RankingItem item) {
     return ClipRRect(
-      borderRadius: BorderRadius.circular(10), // 13에서 20% 감소 (13 * 0.8 = 10.4 ≈ 10)
+      borderRadius: _imageBorderRadius,
       child: _buildItemImage(ref, item),
     );
   }
 
-  // 이미지 빌드 - getImagePathProvider 사용하여 이마 위 이미지와 동일한 로직 적용
   Widget _buildItemImage(WidgetRef ref, RankingItem item) {
     if (item.assetKey != null) {
-      // 현재 선택된 필터의 gameId 가져오기
       final selectedFilter = ref.watch(selectedFilterProvider);
 
       if (selectedFilter != null) {
-        print(
-            '🎯 [RankingSlot] 이미지 로딩 시작: gameId=${selectedFilter.id}, assetKey=${item.assetKey}');
-
-        // getImagePathProvider 사용하여 이마 위 이미지와 동일한 로직 적용
         final imagePathProvider = ref.read(getImagePathProvider);
 
         return FutureBuilder<ImagePathResult>(
-          key: ValueKey(
-              '${selectedFilter.id}_${item.assetKey}'), // 필터나 아이템 변경시 재빌드 보장
+          key: ValueKey('${selectedFilter.id}_${item.assetKey}'),
           future: imagePathProvider(selectedFilter.id, item.assetKey!),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
-              print('📍 [RankingSlot] 이미지 로딩 중...');
               return _buildLoadingImage();
             }
 
             if (snapshot.hasError) {
-              print('❌ [RankingSlot] 이미지 로딩 에러: ${snapshot.error}');
               return _buildFallbackImage(item);
             }
 
             if (snapshot.hasData) {
               final pathResult = snapshot.data!;
-              print(
-                  '✅ [RankingSlot] 이미지 경로 결과: local=${pathResult.localPath}, remote=${pathResult.remotePath}');
-
               Widget? imageWidget;
 
-              // 로컬 이미지 우선 시도
               if (pathResult.localPath != null) {
                 final file = File(pathResult.localPath!);
                 if (file.existsSync()) {
-                  print('✅ [RankingSlot] 로컬 이미지 사용: ${pathResult.localPath}');
                   imageWidget = Image.file(
                     file,
                     errorBuilder: (context, error, stackTrace) {
-                      print('❌ [RankingSlot] 로컬 이미지 로딩 실패: $error');
                       return _buildFallbackImage(item);
                     },
                   );
                 }
               }
 
-              // 리모트 이미지 시도
               if (imageWidget == null && pathResult.remotePath != null) {
-                print('🌐 [RankingSlot] 리모트 이미지 시도: ${pathResult.remotePath}');
                 imageWidget = Image.network(
                   pathResult.remotePath!,
                   errorBuilder: (context, error, stackTrace) {
-                    print('❌ [RankingSlot] 리모트 이미지 로딩 실패: $error');
                     return _buildFallbackImage(item);
                   },
                   loadingBuilder: (context, child, loadingProgress) {
@@ -289,29 +281,21 @@ class RankingSlotWidget extends ConsumerWidget {
                 );
               }
 
-              // 이미지 비율에 따른 조건부 크롭핑
               if (imageWidget != null) {
                 return _buildConditionalCroppedImage(
                     imageWidget, pathResult, item);
               }
             }
 
-            print('⚠️ [RankingSlot] 모든 이미지 로딩 실패, fallback 사용');
             return _buildFallbackImage(item);
           },
         );
-      } else {
-        print('⚠️ [RankingSlot] selectedFilter가 null, fallback 사용');
       }
-    } else {
-      print('⚠️ [RankingSlot] assetKey가 null, fallback 사용');
     }
 
-    // assetKey가 없거나 selectedFilter가 null이면 assets 이미지 시도
     return _buildFallbackImage(item);
   }
 
-  // Fallback 이미지 (assets 또는 기본 아이콘)
   Widget _buildFallbackImage(RankingItem item) {
     if (item.imagePath != null) {
       return Image.asset(
@@ -327,16 +311,15 @@ class RankingSlotWidget extends ConsumerWidget {
     }
   }
 
-  // 로딩 중 이미지
   Widget _buildLoadingImage() {
     return Container(
       color: Colors.white12,
       child: const Center(
         child: SizedBox(
-          width: 16, // 20에서 20% 감소 (20 * 0.8 = 16)
-          height: 16, // 20에서 20% 감소
+          width: 16,
+          height: 16,
           child: CircularProgressIndicator(
-            strokeWidth: 1.6, // 2에서 20% 감소 (2 * 0.8 = 1.6)
+            strokeWidth: 1.6,
             valueColor: AlwaysStoppedAnimation<Color>(Colors.white54),
           ),
         ),
@@ -344,289 +327,67 @@ class RankingSlotWidget extends ConsumerWidget {
     );
   }
 
-  // 기본 아이콘
   Widget _buildDefaultIcon() {
     return Container(
       color: Colors.white24,
       child: const Icon(
         Icons.person,
-        size: 26, // 32에서 20% 감소 (32 * 0.8 = 25.6 ≈ 26)
+        size: 26,
         color: Colors.white60,
       ),
     );
   }
 
-  // 이미지 비율에 따른 조건부 크롭핑
   Widget _buildConditionalCroppedImage(
       Widget imageWidget, ImagePathResult pathResult, RankingItem item) {
-    // 이미지 파일이 있을 때만 크기 확인 수행
     if (pathResult.localPath != null) {
       final file = File(pathResult.localPath!);
       if (file.existsSync()) {
         final imagePath = file.path;
         final cachedPortraitInfo = _getCachedPortraitInfo(imagePath, item);
 
-        // 캐시된 정보가 있으면 즉시 적용 (깜빡임 방지)
         if (cachedPortraitInfo != null) {
-          if (cachedPortraitInfo) {
-            // 세로가 긴 이미지: 가로형과 동일한 자연스러운 크롭 적용
-            return Stack(
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(10), // 13에서 20% 감소 (13 * 0.8 = 10.4 ≈ 10)
-                  child: SizedBox(
-                    width: 43, // 54에서 20% 감소 (54 * 0.8 = 43.2 ≈ 43)
-                    height: 43, // 54에서 20% 감소
-                    child: FittedBox(
-                      fit: BoxFit.cover,
-                      child: imageWidget,
-                    ),
-                  ),
-                ),
-                // 텍스트 오버레이
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 1.6, // 2에서 20% 감소 (2 * 0.8 = 1.6)
-                  child: Align(
-                    alignment: Alignment.bottomCenter,
-                    child: Text(
-                      item.name,
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 8, // 10에서 20% 감소 (10 * 0.8 = 8)
-                        fontWeight: FontWeight.bold,
-                        shadows: [
-                          Shadow(
-                            offset: Offset(0.4, 0.4), // 0.5에서 20% 감소 (0.5 * 0.8 = 0.4)
-                            blurRadius: 0.8, // 1에서 20% 감소 (1 * 0.8 = 0.8)
-                            color: Colors.black,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            );
-          } else {
-            // 가로가 긴 이미지나 정사각형: 자연스럽게 크롭
-            return Stack(
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(10), // 13에서 20% 감소 (13 * 0.8 = 10.4 ≈ 10)
-                  child: SizedBox(
-                    width: 43, // 54에서 20% 감소 (54 * 0.8 = 43.2 ≈ 43)
-                    height: 43, // 54에서 20% 감소
-                    child: FittedBox(
-                      fit: BoxFit.cover,
-                      child: imageWidget,
-                    ),
-                  ),
-                ),
-                // 텍스트 오버레이
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 1.6, // 2에서 20% 감소 (2 * 0.8 = 1.6)
-                  child: Align(
-                    alignment: Alignment.bottomCenter,
-                    child: Text(
-                      item.name,
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 8, // 10에서 20% 감소 (10 * 0.8 = 8)
-                        fontWeight: FontWeight.bold,
-                        shadows: [
-                          Shadow(
-                            offset: Offset(0.4, 0.4), // 0.5에서 20% 감소 (0.5 * 0.8 = 0.4)
-                            blurRadius: 0.8, // 1에서 20% 감소 (1 * 0.8 = 0.8)
-                            color: Colors.black,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            );
-          }
+          return _buildImageWithOverlay(imageWidget, item);
         }
 
-        // 캐시된 정보가 없을 때만 FutureBuilder 사용
         return FutureBuilder<ui.Image>(
           future: _getImageInfo(file, item),
           builder: (context, snapshot) {
             if (snapshot.hasData && snapshot.data != null) {
-              final image = snapshot.data!;
-              final isPortrait = image.height > image.width;
-
-              if (isPortrait) {
-                // 세로가 긴 이미지: 가로형과 동일한 자연스러운 크롭 적용
-                return Stack(
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(13),
-                      child: SizedBox(
-                        width: 54,
-                        height: 54,
-                        child: FittedBox(
-                          fit: BoxFit.cover,
-                          child: imageWidget,
-                        ),
-                      ),
-                    ),
-                    // 텍스트 오버레이
-                    Positioned(
-                      left: 0,
-                      right: 0,
-                      bottom: 1.6, // 2에서 20% 감소 (2 * 0.8 = 1.6)
-                      child: Align(
-                        alignment: Alignment.bottomCenter,
-                        child: Text(
-                          item.name,
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 8, // 10에서 20% 감소 (10 * 0.8 = 8)
-                            fontWeight: FontWeight.bold,
-                            shadows: [
-                              Shadow(
-                                offset: Offset(0.5, 0.5),
-                                blurRadius: 1,
-                                color: Colors.black,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                );
-              } else {
-                // 가로가 긴 이미지나 정사각형: 자연스럽게 크롭
-                return Stack(
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(13),
-                      child: SizedBox(
-                        width: 54,
-                        height: 54,
-                        child: FittedBox(
-                          fit: BoxFit.cover,
-                          child: imageWidget,
-                        ),
-                      ),
-                    ),
-                    // 텍스트 오버레이
-                    Positioned(
-                      left: 0,
-                      right: 0,
-                      bottom: 1.6, // 2에서 20% 감소 (2 * 0.8 = 1.6)
-                      child: Align(
-                        alignment: Alignment.bottomCenter,
-                        child: Text(
-                          item.name,
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 8, // 10에서 20% 감소 (10 * 0.8 = 8)
-                            fontWeight: FontWeight.bold,
-                            shadows: [
-                              Shadow(
-                                offset: Offset(0.5, 0.5),
-                                blurRadius: 1,
-                                color: Colors.black,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                );
-              }
+              return _buildImageWithOverlay(imageWidget, item);
             }
-
-            // 이미지 정보 로딩 중: 이전 상태 유지를 위해 기본 크롭 적용
-            // (원본 이미지가 깜빡이는 것을 방지)
-            return Stack(
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(10), // 13에서 20% 감소 (13 * 0.8 = 10.4 ≈ 10)
-                  child: SizedBox(
-                    width: 43, // 54에서 20% 감소 (54 * 0.8 = 43.2 ≈ 43)
-                    height: 43, // 54에서 20% 감소
-                    child: FittedBox(
-                      fit: BoxFit.cover,
-                      child: imageWidget,
-                    ),
-                  ),
-                ),
-                // 텍스트 오버레이
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 1.6, // 2에서 20% 감소 (2 * 0.8 = 1.6)
-                  child: Align(
-                    alignment: Alignment.bottomCenter,
-                    child: Text(
-                      item.name,
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 8, // 10에서 20% 감소 (10 * 0.8 = 8)
-                        fontWeight: FontWeight.bold,
-                        shadows: [
-                          Shadow(
-                            offset: Offset(0.4, 0.4), // 0.5에서 20% 감소 (0.5 * 0.8 = 0.4)
-                            blurRadius: 0.8, // 1에서 20% 감소 (1 * 0.8 = 0.8)
-                            color: Colors.black,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            );
+            return _buildImageWithOverlay(imageWidget, item);
           },
         );
       }
     }
 
-    // 로컬 파일이 없는 경우 (리모트 이미지): 기본 BoxFit.cover 적용
+    return _buildImageWithOverlay(imageWidget, item);
+  }
+
+  Widget _buildImageWithOverlay(Widget imageWidget, RankingItem item) {
     return Stack(
       children: [
         ClipRRect(
-          borderRadius: BorderRadius.circular(10), // 13에서 20% 감소 (13 * 0.8 = 10.4 ≈ 10)
+          borderRadius: BorderRadius.circular(10),
           child: SizedBox(
-            width: 43, // 54에서 20% 감소 (54 * 0.8 = 43.2 ≈ 43)
-            height: 43, // 54에서 20% 감소
+            width: 43,
+            height: 43,
             child: FittedBox(
               fit: BoxFit.cover,
               child: imageWidget,
             ),
           ),
         ),
-        // 텍스트 오버레이
         Positioned(
           left: 0,
           right: 0,
-          bottom: 2,
+          bottom: 1.6,
           child: Align(
             alignment: Alignment.bottomCenter,
             child: Text(
               item.name,
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
-                shadows: [
-                  Shadow(
-                    offset: Offset(0.5, 0.5),
-                    blurRadius: 1,
-                    color: Colors.black,
-                  ),
-                ],
-              ),
+              style: _itemNameTextStyle,
             ),
           ),
         ),
@@ -634,13 +395,10 @@ class RankingSlotWidget extends ConsumerWidget {
     );
   }
 
-  // 이미지 파일에서 크기 정보를 획득하는 헬퍼 메서드
-  // 이미지 정보를 캐시와 함께 가져오기 (깜빡임 방지)
   Future<ui.Image> _getImageInfo(File imageFile, RankingItem item) async {
     final imagePath = imageFile.path;
     final cacheKey = '${item.id}_$imagePath';
 
-    // 이미 캐시된 정보가 있으면 즉시 반환
     if (_imageInfoCache.containsKey(cacheKey)) {
       return _imageInfoCache[cacheKey]!;
     }
@@ -649,40 +407,64 @@ class RankingSlotWidget extends ConsumerWidget {
     final codec = await ui.instantiateImageCodec(bytes);
     final frame = await codec.getNextFrame();
 
-    // 캐시에 저장 (이미지 정보와 세로/가로 여부 모두)
     _imageInfoCache[cacheKey] = frame.image;
     _imageIsPortraitCache[cacheKey] = frame.image.height > frame.image.width;
 
     return frame.image;
   }
 
-  // 캐시된 세로/가로 정보 즉시 확인 (로딩 없이)
   bool? _getCachedPortraitInfo(String imagePath, RankingItem item) {
     final cacheKey = '${item.id}_$imagePath';
     return _imageIsPortraitCache[cacheKey];
+  }
+  
+  static void clearImageCache() {
+    _imageInfoCache.clear();
+    _imageIsPortraitCache.clear();
+    _preloadedImageWidgetCache.clear();
+    _loadingImages.clear();
+  }
+  
+  static void clearCacheForItem(String itemId) {
+    final keysToRemove = <String>[];
+    
+    for (final key in _imageInfoCache.keys) {
+      if (key.startsWith(itemId)) keysToRemove.add(key);
+    }
+    for (final key in _imageIsPortraitCache.keys) {
+      if (key.startsWith(itemId)) keysToRemove.add(key);
+    }
+    for (final key in _preloadedImageWidgetCache.keys) {
+      if (key.contains(itemId)) keysToRemove.add(key);
+    }
+    
+    for (final key in keysToRemove) {
+      _imageInfoCache.remove(key);
+      _imageIsPortraitCache.remove(key);
+      _preloadedImageWidgetCache.remove(key);
+    }
   }
 
   Color _getRankColor(int rank) {
     switch (rank) {
       case 1:
-        return const Color(0xFFFFD700); // 금색
+        return const Color(0xFFFFD700);
       case 2:
-        return const Color(0xFFC0C0C0); // 은색
+        return const Color(0xFFC0C0C0);
       case 3:
-        return const Color(0xFFCD7F32); // 동색
+        return const Color(0xFFCD7F32);
       case 4:
       case 5:
-        return Colors.purple; // 상위권
+        return Colors.purple;
       case 6:
       case 7:
-        return Colors.blue; // 중위권
+        return Colors.blue;
       default:
-        return Colors.green; // 하위권
+        return Colors.green;
     }
   }
 }
 
-// 순위별 메달 아이콘 위젯 (추후 사용 가능)
 class RankMedalWidget extends StatelessWidget {
   final int rank;
   final double size;
@@ -690,7 +472,7 @@ class RankMedalWidget extends StatelessWidget {
   const RankMedalWidget({
     super.key,
     required this.rank,
-    this.size = 19, // 24에서 20% 감소 (24 * 0.8 = 19.2 ≈ 19)
+    this.size = 19,
   });
 
   @override
