@@ -1,3 +1,4 @@
+import 'package:filterplay/screens/test_ranking_filter_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../constants/theme_colors.dart';
@@ -64,7 +65,7 @@ class _RankingFilterListScreenState
     // AssetProvider에서 실시간 다운로드 상태 확인
     final downloadStatus = ref.read(downloadStatusProvider(filter.id));
     final isDownloaded = downloadStatus == DownloadStatus.downloaded;
-    
+
     // 이미 다운로드 중인 경우 중복 실행 방지
     if (downloadStatus == DownloadStatus.downloading) {
       print('⚠️ 이미 다운로드 중입니다: ${filter.name}');
@@ -75,7 +76,8 @@ class _RankingFilterListScreenState
     bool needsUpdate = false;
     if (isDownloaded && filter.manifestPath != null) {
       try {
-        needsUpdate = await FilterDataService.checkFilterVersionUpdate(filter.id);
+        needsUpdate =
+            await FilterDataService.checkFilterVersionUpdate(filter.id);
       } catch (e) {
         print('⚠️ 버전 체크 실패, 기존 동작 유지: $e');
       }
@@ -111,21 +113,24 @@ class _RankingFilterListScreenState
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => const RankingFilterScreen(),
+          builder: (context) => const TestRankingFilterScreen(),
         ),
       );
     }
   }
 
   Future<void> _startDownload(
-      BuildContext context, WidgetRef ref, FilterItem filter, {bool isUpdate = false}) async {
+      BuildContext context, WidgetRef ref, FilterItem filter,
+      {bool isUpdate = false}) async {
     if (filter.manifestPath == null) {
       _showErrorDialog(context, 'No download information available.');
       return;
     }
 
     // 다운로드 시작 전에 즉시 downloading 상태로 업데이트
-    ref.read(assetProvider.notifier).updateDownloadStatus(filter.id, DownloadStatus.downloading);
+    ref
+        .read(assetProvider.notifier)
+        .updateDownloadStatus(filter.id, DownloadStatus.downloading);
 
     try {
       await ref
@@ -154,10 +159,13 @@ class _RankingFilterListScreenState
       }
     } catch (e) {
       // 에러 발생 시 상태를 실패로 복구
-      ref.read(assetProvider.notifier).updateDownloadStatus(filter.id, DownloadStatus.failed);
-      
+      ref
+          .read(assetProvider.notifier)
+          .updateDownloadStatus(filter.id, DownloadStatus.failed);
+
       if (context.mounted) {
-        _showErrorDialog(context, 'Failed to start ${isUpdate ? "update" : "download"}: $e');
+        _showErrorDialog(
+            context, 'Failed to start ${isUpdate ? "update" : "download"}: $e');
       }
     }
   }
@@ -220,7 +228,6 @@ class _RankingFilterListScreenState
       },
     );
   }
-
 
   void _showErrorDialog(BuildContext context, String message) {
     showDialog(
@@ -418,8 +425,8 @@ class _RankingFilterListScreenState
 
     // 로컬 UI 설정 (960x600 이미지를 위한 1열 레이아웃)
     const localUIConfig = {
-      'columns': 1,        // 1열로 설정하여 가로 이미지를 화면 폭에 맞게 표시
-      'aspectRatio': 160,  // 1.6 * 100 (960x600 비율)
+      'columns': 1, // 1열로 설정하여 가로 이미지를 화면 폭에 맞게 표시
+      'aspectRatio': 160, // 1.6 * 100 (960x600 비율)
     };
 
     print('✅ 로컬 UI 설정 적용: $localUIConfig');
@@ -446,7 +453,7 @@ class _FilterCard extends ConsumerWidget {
         (f) => f.gameId == filterId,
         orElse: () => throw Exception('Filter not found'),
       );
-      
+
       if (filterInfo != null && masterManifest != null) {
         return masterManifest.getFullThumbnailUrl(filterInfo.thumbnailUrl);
       }
@@ -479,11 +486,11 @@ class _FilterCard extends ConsumerWidget {
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: downloadStatus == DownloadStatus.downloading ? null : onTap,
-        splashColor: downloadStatus == DownloadStatus.downloading 
-            ? Colors.transparent 
+        splashColor: downloadStatus == DownloadStatus.downloading
+            ? Colors.transparent
             : hunterPinkShadow.withValues(alpha: 0.1),
-        highlightColor: downloadStatus == DownloadStatus.downloading 
-            ? Colors.transparent 
+        highlightColor: downloadStatus == DownloadStatus.downloading
+            ? Colors.transparent
             : hunterPinkShadow.withValues(alpha: 0.1),
         child: Stack(
           fit: StackFit.expand, // Stack의 자식들이 전체를 채우도록 함
@@ -509,8 +516,8 @@ class _FilterCard extends ConsumerWidget {
                         child: Center(
                           child: CircularProgressIndicator(
                             value: loadingProgress.expectedTotalBytes != null
-                                ? loadingProgress.cumulativeBytesLoaded / 
-                                  loadingProgress.expectedTotalBytes!
+                                ? loadingProgress.cumulativeBytesLoaded /
+                                    loadingProgress.expectedTotalBytes!
                                 : null,
                             color: ThemeColors.neonBladeBlue,
                             strokeWidth: 2,
@@ -531,7 +538,7 @@ class _FilterCard extends ConsumerWidget {
                     },
                   );
                 }
-                
+
                 // 썸네일 URL을 가져오는 중이거나 실패한 경우 기본 이미지
                 return Image.asset(
                   'assets/images/ranking/sample_thumnail.png',
