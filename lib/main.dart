@@ -24,7 +24,7 @@ void main() {
     MobileAds.instance.updateRequestConfiguration(
       RequestConfiguration(
         testDeviceIds: [
-          // '33BE2250B43518CCDA7DE426D04EE231', // 예시 - 실제 기기 ID로 교체
+          '7B9E1235956D30F37D974495395E663E', // 실제 테스트 기기 ID
         ],
       ),
     );
