@@ -33,7 +33,6 @@ class ResultScreen extends ConsumerWidget {
     final percentage =
         totalBalloons > 0 ? (score / totalBalloons * 100).round() : 0;
     final isExcellent = percentage >= 80;
-    final isGood = percentage >= 60;
 
     // 동영상 전용 모드인지 확인
     final isVideoOnlyMode =
@@ -99,34 +98,6 @@ class ResultScreen extends ConsumerWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       // 게임 결과 모드
-
-                      Text(
-                        isExcellent
-                            ? '🎉'
-                            : isGood
-                                ? '😊'
-                                : '😔',
-                        style: const TextStyle(fontSize: 80),
-                      ),
-
-                      const SizedBox(height: 24),
-
-                      Text(
-                        isExcellent
-                            ? '완벽해요!'
-                            : isGood
-                                ? '잘했어요!'
-                                : '다시 도전해보세요!',
-                        style: Theme.of(context)
-                            .textTheme
-                            .headlineMedium
-                            ?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: isExcellent
-                                  ? Colors.amber[700]
-                                  : Colors.blue[700],
-                            ),
-                      ),
                       const SizedBox(height: 32),
 
                       Container(
