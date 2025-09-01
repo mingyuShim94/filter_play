@@ -12,6 +12,7 @@ import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_screen_recording/flutter_screen_recording.dart';
 import 'package:video_player/video_player.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import '../services/forehead_rectangle_service.dart';
 import '../providers/ranking_game_provider.dart';
 import '../providers/filter_provider.dart';
@@ -19,6 +20,7 @@ import '../providers/image_path_provider.dart';
 import '../services/ranking_data_service.dart';
 import '../services/video_processing_service.dart';
 import '../widgets/ranking_slot_panel.dart';
+import '../config/ad_config.dart';
 import 'result_screen.dart';
 
 /// RankingFilterScreen is a ranking filter page.
@@ -80,6 +82,11 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
   int _processingRetryCount = 0;
   static const int _maxProcessingRetries = 3;
 
+  // AdMob 전면 광고 관련
+  InterstitialAd? _interstitialAd;
+  bool _isAdLoaded = false;
+  String? _pendingVideoPath;
+
   @override
   void initState() {
     super.initState();
@@ -92,6 +99,70 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
     // 위젯 트리 빌드 완료 후 랭킹 게임 초기화
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeRankingGame();
+      _loadInterstitialAd();
+    });
+  }
+
+  // 전면 광고 로드
+  void _loadInterstitialAd() {
+    InterstitialAd.load(
+      adUnitId: AdConfig.interstitialAdUnitId,
+      request: const AdRequest(),
+      adLoadCallback: InterstitialAdLoadCallback(
+        onAdLoaded: (InterstitialAd ad) {
+          print('📺 전면 광고 로드 성공');
+          _interstitialAd = ad;
+          _isAdLoaded = true;
+
+          // 광고 이벤트 콜백 설정
+          _interstitialAd!.fullScreenContentCallback =
+              FullScreenContentCallback(
+            onAdShowedFullScreenContent: (ad) {
+              print('📺 전면 광고 표시됨');
+            },
+            onAdFailedToShowFullScreenContent: (ad, err) {
+              print('📺 전면 광고 표시 실패: $err');
+              ad.dispose();
+              _interstitialAd = null;
+              _isAdLoaded = false;
+              // 광고 실패 시에도 비디오 처리 진행
+              if (_pendingVideoPath != null) {
+                _processVideoAfterAd(_pendingVideoPath!);
+              }
+            },
+            onAdDismissedFullScreenContent: (ad) {
+              print('📺 전면 광고 종료됨');
+              ad.dispose();
+              _interstitialAd = null;
+              _isAdLoaded = false;
+              // 광고 종료 후 비디오 처리 시작
+              if (_pendingVideoPath != null) {
+                _processVideoAfterAd(_pendingVideoPath!);
+              }
+            },
+          );
+        },
+        onAdFailedToLoad: (LoadAdError error) {
+          print('📺 전면 광고 로드 실패: $error');
+          _isAdLoaded = false;
+        },
+      ),
+    );
+  }
+
+  // 광고 종료 후 비디오 처리 시작
+  void _processVideoAfterAd(String originalVideoPath) async {
+    _pendingVideoPath = null;
+
+    // 재시도 카운터 초기화
+    _processingRetryCount = 0;
+
+    // 재시도 로직이 포함된 비디오 처리 시작
+    await _processVideoWithRetry(originalVideoPath);
+
+    // 처리 완료 후 상태 업데이트
+    setState(() {
+      _isProcessing = false;
     });
   }
 
@@ -148,6 +219,9 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
 
     // 이마 이미지 리소스 정리
     ForeheadRectangleService.disposeTextureImage();
+
+    // 광고 리소스 정리
+    _interstitialAd?.dispose();
 
     // 시스템 UI 모드를 기본값으로 복구
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual,
@@ -775,7 +849,6 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
 
     setState(() {
       _isRecording = false;
-      _isProcessing = true;
       _statusText = '녹화 완료 중...';
     });
 
@@ -784,16 +857,23 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
       String originalVideoPath = await FlutterScreenRecording.stopRecordScreen;
 
       if (mounted && originalVideoPath.isNotEmpty) {
-        // 재시도 카운터 초기화
-        _processingRetryCount = 0;
+        // 비디오 경로 저장 (광고 후 처리용)
+        _pendingVideoPath = originalVideoPath;
 
-        // 재시도 로직이 포함된 비디오 처리 시작
-        await _processVideoWithRetry(originalVideoPath);
-
-        // 처리 완료 후 상태 업데이트
-        setState(() {
-          _isProcessing = false;
-        });
+        // 광고가 로드되어 있으면 표시, 아니면 바로 비디오 처리
+        if (_isAdLoaded && _interstitialAd != null) {
+          setState(() {
+            _statusText = '📺 광고 준비 중...';
+          });
+          _interstitialAd!.show();
+        } else {
+          // 광고가 없으면 바로 비디오 처리 시작
+          print('📺 광고 미로드 상태, 바로 비디오 처리 시작');
+          setState(() {
+            _isProcessing = true;
+          });
+          _processVideoAfterAd(originalVideoPath);
+        }
       } else {
         setState(() {
           _isProcessing = false;
