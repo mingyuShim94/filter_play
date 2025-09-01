@@ -1,5 +1,5 @@
 name: filterplay
-description: "A new Flutter project."
+description: "KDH Ranking Filter - Face detection balloon popping game"
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: "none" # Remove this line if you wish to publish to pub.dev
@@ -79,6 +79,28 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^5.0.0
+  
+  # App Icon Generation
+  flutter_launcher_icons: ^0.14.4
+
+# Flutter Launcher Icons Configuration
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icon/icon.png"
+  min_sdk_android: 21
+  web:
+    generate: true
+    image_path: "assets/icon/icon.png"
+    background_color: "#FFFFFF"
+    theme_color: "#673AB7"
+  windows:
+    generate: true
+    image_path: "assets/icon/icon.png"
+    icon_size: 48
+  macos:
+    generate: true
+    image_path: "assets/icon/icon.png"
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

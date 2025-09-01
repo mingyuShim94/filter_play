@@ -1,4 +1,4 @@
-package com.example.filterplay
+package com.gguggulab.kdhrankingfilter
 
 import io.flutter.embedding.android.FlutterActivity
 
