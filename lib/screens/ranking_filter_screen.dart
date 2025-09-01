@@ -520,8 +520,6 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
             builder: (context) => ResultScreen(
-              score: 0,
-              totalBalloons: 0,
               videoPath: processingResult.outputPath,
               isOriginalVideo: false,
               originalVideoPath: originalVideoPath,
@@ -556,8 +554,6 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
           builder: (context) => ResultScreen(
-            score: 0,
-            totalBalloons: 0,
             videoPath: null,
             processingError: processingResult.error,
             originalVideoPath: originalVideoPath,
@@ -585,8 +581,6 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
           builder: (context) => ResultScreen(
-            score: 0,
-            totalBalloons: 0,
             videoPath: null,
             processingError: VideoProcessingError(
               message: '영상 준비 검증 실패: VideoPlayer 호환성 문제',
@@ -622,8 +616,6 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
           builder: (context) => ResultScreen(
-            score: 0,
-            totalBalloons: 0,
             videoPath: null,
             processingError: VideoProcessingError(
               message: '영상 처리 중 예외 발생: $error',

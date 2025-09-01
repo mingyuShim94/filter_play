@@ -1,4 +1,3 @@
-import 'package:filterplay/screens/test_ranking_filter_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../constants/theme_colors.dart';
@@ -113,7 +112,7 @@ class _RankingFilterListScreenState
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => const TestRankingFilterScreen(),
+          builder: (context) => const RankingFilterScreen(),
         ),
       );
     }

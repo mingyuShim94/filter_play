@@ -88,7 +88,7 @@ class FilterDataService {
       categories.add(
         FilterCategory(
           id: 'ranking',
-          name: '랭킹 필터',
+          name: 'KDH Ranking Filter',
           icon: Icons.leaderboard,
           isEnabled: true,
           items: rankingItems,
