@@ -68,7 +68,7 @@ class ResultScreen extends ConsumerWidget {
                     Expanded(
                       flex: 3,
                       child: Container(
-                        color: Colors.amber,
+                        color: Colors.black,
                         child: VideoPreviewWidget(
                           videoPath: videoPath!,
                           isVideoOnlyMode: true,
@@ -292,15 +292,6 @@ class _VideoPreviewWidgetState extends State<VideoPreviewWidget> {
     });
   }
 
-  void _showFullScreenVideo() {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) =>
-            VideoFullScreenWidget(videoPath: widget.videoPath),
-      ),
-    );
-  }
-
   void _copyErrorToClipboard() async {
     // FFmpeg 처리 에러 정보 포함
     final ffmpegErrorInfo = widget.processingError != null
@@ -370,6 +361,7 @@ ${widget.processingError!.toDetailedString()}
   Widget build(BuildContext context) {
     if (widget.isVideoOnlyMode) {
       // 동영상 전용 모드일 때 화면에 맞게 크기 조정
+
       return SizedBox(
         width: double.infinity,
         height: double.infinity,
@@ -652,205 +644,6 @@ ${widget.processingError!.toDetailedString()}
                 ),
               ),
             ],
-          ),
-        ),
-
-        // 전체화면 버튼
-        Positioned(
-          top: 8,
-          right: 8,
-          child: GestureDetector(
-            onTap: _showFullScreenVideo,
-            child: Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.5),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: const Icon(
-                Icons.fullscreen,
-                color: Colors.white,
-                size: 20,
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// 전체화면 동영상 플레이어
-class VideoFullScreenWidget extends StatefulWidget {
-  final String videoPath;
-
-  const VideoFullScreenWidget({
-    super.key,
-    required this.videoPath,
-  });
-
-  @override
-  State<VideoFullScreenWidget> createState() => _VideoFullScreenWidgetState();
-}
-
-class _VideoFullScreenWidgetState extends State<VideoFullScreenWidget> {
-  late VideoPlayerController _controller;
-  bool _isInitialized = false;
-  bool _hasError = false;
-  String? _errorMessage;
-
-  @override
-  void initState() {
-    super.initState();
-    _initializeVideo();
-  }
-
-  Future<void> _initializeVideo() async {
-    try {
-      _controller = VideoPlayerController.file(File(widget.videoPath));
-      await _controller.initialize();
-
-      if (mounted) {
-        setState(() {
-          _isInitialized = true;
-        });
-        _controller.play(); // 전체화면에서는 자동 재생
-      }
-    } catch (e) {
-      // 전체화면 동영상 초기화 오류 처리 (로깅 생략)
-      if (mounted) {
-        setState(() {
-          _hasError = true;
-          _errorMessage = e.toString();
-        });
-      }
-    }
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  void _togglePlayPause() {
-    setState(() {
-      if (_controller.value.isPlaying) {
-        _controller.pause();
-      } else {
-        _controller.play();
-      }
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      appBar: AppBar(
-        title: const Text('녹화된 영상'),
-        backgroundColor: Colors.black,
-        foregroundColor: Colors.white,
-        iconTheme: const IconThemeData(color: Colors.white),
-      ),
-      body: Center(
-        child: _buildFullScreenVideo(),
-      ),
-    );
-  }
-
-  Widget _buildFullScreenVideo() {
-    if (_hasError) {
-      return Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(
-            Icons.error_outline,
-            size: 64,
-            color: Colors.red,
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            '동영상을 로드할 수 없습니다',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            _errorMessage ?? '알 수 없는 오류',
-            style: const TextStyle(
-              color: Colors.white70,
-              fontSize: 14,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      );
-    }
-
-    if (!_isInitialized) {
-      return const Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          CircularProgressIndicator(
-            color: Colors.white,
-          ),
-          SizedBox(height: 16),
-          Text(
-            '동영상 로딩 중...',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 16,
-            ),
-          ),
-        ],
-      );
-    }
-
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        // 동영상 플레이어
-        AspectRatio(
-          aspectRatio: _controller.value.aspectRatio,
-          child: VideoPlayer(_controller),
-        ),
-
-        const SizedBox(height: 20),
-
-        // 컨트롤
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            IconButton(
-              onPressed: _togglePlayPause,
-              icon: Icon(
-                _controller.value.isPlaying
-                    ? Icons.pause_circle_filled
-                    : Icons.play_circle_filled,
-                size: 48,
-                color: Colors.white,
-              ),
-            ),
-          ],
-        ),
-
-        const SizedBox(height: 10),
-
-        // 진행 상태 바
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: VideoProgressIndicator(
-            _controller,
-            allowScrubbing: true,
-            colors: const VideoProgressColors(
-              playedColor: Colors.white,
-              bufferedColor: Colors.grey,
-              backgroundColor: Colors.grey,
-            ),
           ),
         ),
       ],
