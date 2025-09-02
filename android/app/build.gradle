@@ -57,6 +57,8 @@ android {
         }
         release {
             signingConfig = signingConfigs.release
+            minifyEnabled false
+            shrinkResources false
             // ML Kit 로그 억제
             buildConfigField "boolean", "ENABLE_LOGGING", "false"
         }
