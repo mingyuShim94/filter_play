@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-FilterPlay is a Flutter-based face detection mini-game app where users use mouth movements to pop balloons. The app uses Google ML Kit for face detection and camera functionality to create an interactive AR-style game experience.
+KDH Ranking Filter is a Flutter-based face detection ranking game where users place character images on their forehead via AR overlay and organize them in a 10-slot ranking system. The app features multiple filter categories, remote asset downloading, and screen recording capabilities with Google ML Kit integration.
 
 ## Common Development Commands
 
@@ -34,20 +34,25 @@ FilterPlay is a Flutter-based face detection mini-game app where users use mouth
 - **Theme**: Material 3 design with purple color scheme
 
 ### Screen Architecture
-- `HomeScreen` - Main landing page with game start button and permission status
-- `CameraScreen` - Primary game screen with face detection and overlay
-- `SettingsScreen` - Game settings and sensitivity configuration  
-- `ResultScreen` - Post-game results display
+- `RankingFilterListScreen` - Main landing page with filter category selection and game entry
+- `RankingFilterScreen` - Primary game screen with face detection, character overlay, and ranking slots
+- `ResultScreen` - Post-game video playback and sharing
+- `SettingsScreen` - Game settings and configuration
 
 ### Service Layer
 - `FaceDetectionService` - Google ML Kit face detection wrapper with performance optimization
-- `CameraService` - Camera initialization and management
-- `PermissionService` - Camera permission handling with user-friendly dialogs
-- `LipTrackingService` - Mouth state detection using facial landmarks
-- `ForeheadRectangleService` - Forehead region tracking for game mechanics
+- `ForeheadRectangleService` - Forehead region tracking and character image overlay positioning
+- `FilterDataService` - Remote filter/character data management with Cloudflare R2 backend
+- `RankingDataService` - Character data loading and game content management
+- `AssetDownloadService` - Remote asset downloading and caching system
+- `VideoProcessingService` - Screen recording crop and processing with FFmpeg
 - `PerformanceService` - FPS and performance monitoring
 
 ### Provider Architecture
+- `RankingGameProvider` - Core game state management (current character, ranking slots, game status)
+- `FilterProvider` - Filter category and selection state
+- `AssetProvider` - Remote asset downloading and local caching
+- `ImagePathProvider` - Dynamic image path resolution for downloaded assets
 - `CameraProvider` - Camera state management and initialization
 - `PermissionProvider` - Permission status tracking
 
@@ -55,26 +60,43 @@ FilterPlay is a Flutter-based face detection mini-game app where users use mouth
 - **google_mlkit_face_detection**: Core face detection functionality
 - **camera**: Camera access and image processing
 - **flutter_riverpod**: State management
-- **flame**: Game engine components
+- **flutter_screen_recording**: Screen recording functionality
+- **ffmpeg_kit_flutter_new**: Video processing and cropping
+- **dio**: HTTP client for remote asset downloading
 - **permission_handler**: Runtime permissions
+- **google_mobile_ads**: AdMob integration for interstitial ads
 - **firebase_core/analytics/crashlytics**: Analytics and crash reporting
 
-### Face Detection Implementation
-The app uses a phased approach for ML Kit configuration:
-- **Phase 2B**: Basic face detection with bounding boxes (landmarks disabled for performance)
-- **Phase 2C**: Enhanced detection with lip landmarks enabled for mouth tracking
-- Performance-optimized settings: Fast mode, classification disabled, tracking disabled
+### Core Game Architecture
 
-### Game Mechanics
-- 15-second timer-based gameplay
-- Mouth open/close detection triggers balloon popping
-- Forehead region tracking for balloon placement
-- Real-time performance monitoring and debug overlays
+**Ranking Game Flow**
+- `RankingGameState` manages 10-slot ranking system with character placement
+- `ForeheadRectangleService` calculates precise forehead positioning for AR overlay
+- `FilterDataService` handles remote filter categories and character data from Cloudflare R2
+- Asset system supports both local fallback images and dynamically downloaded content
+
+**Face Detection Pipeline**
+- Optimized ML Kit settings: landmarks enabled, classification/tracking disabled for performance
+- Real-time forehead region calculation using facial landmarks (eyes, nose positions)
+- Character image overlay with 3D perspective and rotation matching face orientation
+
+**Remote Asset System**
+- Master manifest from Cloudflare R2 defines available filter categories
+- Individual filter manifests contain character data and asset URLs
+- Local caching with fallback to bundled assets
+- Dynamic image path resolution through `ImagePathProvider`
 
 ### Development Notes
 - Primary target platform is Android (iOS secondary)
-- Debug features controlled by `_showDebugInfo` flag in CameraScreen
-- Extensive Korean language UI text
+- Extensive Korean language UI text throughout the app
 - Performance monitoring built-in for ML Kit optimization
+- Screen recording with automatic camera preview cropping post-processing
+- AdMob interstitial ads displayed after recording completion
 - 빌드해서 정상작동확인하려고 flutter build apk --debug 하는건 나한테 시키고 너가 하지마라. 내가 하는게 빠르다.
 - 한글로 설명해
+
+### Asset Management
+- **Remote First**: Assets downloaded from Cloudflare R2 with local caching
+- **Fallback System**: Bundled assets used when downloads fail
+- **Manifest Structure**: Master manifest → Filter manifests → Character data
+- **Cache Services**: `ManifestCacheService` and `AssetCacheService` for performance

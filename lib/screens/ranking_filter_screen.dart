@@ -76,7 +76,10 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
   double _statusBarHeight = 0;
 
   // 크롭 영역 시각화 관련
-  bool _showCropArea = false;
+  final bool _showCropArea = false;
+
+  // 샘플 셀피 오버레이 관련
+  final bool _showSampleSelfie = true;
 
   // 비디오 처리 재시도 관련
   int _processingRetryCount = 0;
@@ -1078,6 +1081,23 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
                               ),
                             ),
                           ),
+
+                          // 샘플 셀피 이미지 오버레이 (스크린샷용)
+                          if (_showSampleSelfie)
+                            Positioned(
+                              left: leftOffset,
+                              top: topOffset,
+                              width: cameraWidth,
+                              height: cameraHeight,
+                              child: ClipRect(
+                                child: Image.asset(
+                                  'assets/images/sample_selfie3.jpeg',
+                                  width: cameraWidth,
+                                  height: cameraHeight,
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                            ),
 
                           // 이마 이미지 오버레이 (얼굴이 감지되고 이마 사각형이 있을 때만)
                           if (_currentForeheadRectangle != null &&
