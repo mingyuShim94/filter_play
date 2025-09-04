@@ -79,7 +79,7 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
   final bool _showCropArea = false;
 
   // 샘플 셀피 오버레이 관련
-  final bool _showSampleSelfie = true;
+  final bool _showSampleSelfie = false;
 
   // 비디오 처리 재시도 관련
   int _processingRetryCount = 0;

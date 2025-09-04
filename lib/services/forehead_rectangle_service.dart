@@ -112,8 +112,9 @@ class ForeheadRectangleService {
   static final Set<String> _loadingImages = {};
   static const int _maxCacheSize = 15; // 최대 캐시 크기
 
-  // 스케일 계산을 위한 기준값들
-  static const double _baseFaceSize = 200.0; // 기준 얼굴 크기 (픽셀)
+  // 스케일 계산을 위한 기준값들 (카메라 타입별)
+  static const double _baseFaceSizeFront = 200.0; // 전면 카메라 기준 얼굴 크기 (픽셀)
+  static const double _baseFaceSizeRear = 120.0; // 후면 카메라 기준 얼굴 크기 (픽셀)
   static const double _minScale = 0.5; // 최소 스케일
   static const double _maxScale = 2.0; // 최대 스케일
 
@@ -306,9 +307,10 @@ class ForeheadRectangleService {
         textureImage: textureImage,
       );
 
-      // 4단계: 얼굴 크기 기반 스케일 계산
+      // 4단계: 얼굴 크기 기반 스케일 계산 (카메라 타입별)
       final avgFaceSize = (faceWidth + faceHeight) / 2.0;
-      final scale = _calculateScale(avgFaceSize);
+      final isFrontCamera = controller.description.lensDirection == CameraLensDirection.front;
+      final scale = _calculateScale(avgFaceSize, isFrontCamera);
 
       // 5단계: 회전각 처리 - 디바이스 센서 orientation 보정 적용
       final rawRotY = face.headEulerAngleY ?? 0.0;
@@ -347,9 +349,10 @@ class ForeheadRectangleService {
     }
   }
 
-  /// 얼굴 크기 기반 스케일 계산
-  static double _calculateScale(double faceSize) {
-    final ratio = faceSize / _baseFaceSize;
+  /// 얼굴 크기 기반 스케일 계산 (카메라 타입별)
+  static double _calculateScale(double faceSize, bool isFrontCamera) {
+    final baseFaceSize = isFrontCamera ? _baseFaceSizeFront : _baseFaceSizeRear;
+    final ratio = faceSize / baseFaceSize;
     return ratio.clamp(_minScale, _maxScale);
   }
 
