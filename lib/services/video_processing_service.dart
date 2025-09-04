@@ -333,6 +333,95 @@ class VideoProcessingService {
     required double statusBarHeight,
     Function(double progress)? progressCallback,
   }) async {
+    // 하드웨어 인코더 시도 후 실패 시 소프트웨어 인코더로 폴백
+    final result = await _cropVideoWithFallback(
+      inputPath: inputPath,
+      screenWidth: screenWidth,
+      screenHeight: screenHeight,
+      cameraWidth: cameraWidth,
+      cameraHeight: cameraHeight,
+      leftOffset: leftOffset,
+      topOffset: topOffset,
+      statusBarHeight: statusBarHeight,
+      progressCallback: progressCallback,
+    );
+    
+    return result;
+  }
+
+  /// 하드웨어 인코더 시도 후 실패 시 소프트웨어 인코더로 폴백하는 내부 메서드
+  static Future<VideoProcessingResult> _cropVideoWithFallback({
+    required String inputPath,
+    required double screenWidth,
+    required double screenHeight,
+    required double cameraWidth,
+    required double cameraHeight,
+    required double leftOffset,
+    required double topOffset,
+    required double statusBarHeight,
+    Function(double progress)? progressCallback,
+  }) async {
+    // 1차 시도: 하드웨어 인코더
+    final hardwareResult = await _cropVideoWithEncoder(
+      inputPath: inputPath,
+      screenWidth: screenWidth,
+      screenHeight: screenHeight,
+      cameraWidth: cameraWidth,
+      cameraHeight: cameraHeight,
+      leftOffset: leftOffset,
+      topOffset: topOffset,
+      statusBarHeight: statusBarHeight,
+      useHardwareEncoder: true,
+      progressCallback: progressCallback,
+    );
+
+    // 하드웨어 인코더 성공 시 바로 반환
+    if (hardwareResult.success) {
+      return hardwareResult;
+    }
+
+    // 하드웨어 인코더 실패 시 소프트웨어 인코더로 폴백
+    final softwareResult = await _cropVideoWithEncoder(
+      inputPath: inputPath,
+      screenWidth: screenWidth,
+      screenHeight: screenHeight,
+      cameraWidth: cameraWidth,
+      cameraHeight: cameraHeight,
+      leftOffset: leftOffset,
+      topOffset: topOffset,
+      statusBarHeight: statusBarHeight,
+      useHardwareEncoder: false,
+      progressCallback: progressCallback,
+    );
+
+    // 소프트웨어 인코더 성공 시 폴백 성공 메시지 추가
+    if (softwareResult.success && softwareResult.error == null) {
+      // 기존 에러 정보에 폴백 성공 메시지 추가
+      final updatedResult = VideoProcessingResult(
+        success: true,
+        outputPath: softwareResult.outputPath,
+      );
+      
+      return updatedResult;
+    }
+
+    // 하드웨어와 소프트웨어 모두 실패한 경우 하드웨어 에러 정보 반환
+    return hardwareResult;
+  }
+
+  /// 지정된 인코더로 비디오 크롭을 수행하는 내부 메서드
+  static Future<VideoProcessingResult> _cropVideoWithEncoder({
+    required String inputPath,
+    required double screenWidth,
+    required double screenHeight,
+    required double cameraWidth,
+    required double cameraHeight,
+    required double leftOffset,
+    required double topOffset,
+    required double statusBarHeight,
+    required bool useHardwareEncoder,
+    Function(double progress)? progressCallback,
+  }) async {
     final logs = <String>[];
     String? lastStatistics;
     String? outputPath;
@@ -344,8 +433,9 @@ class VideoProcessingService {
 
       final fileName = path.basenameWithoutExtension(inputPath);
       final extension = path.extension(inputPath);
+      final encoderSuffix = useHardwareEncoder ? 'hw' : 'sw';
       outputPath = path.join(outputDirectory,
-          '${fileName}_camera_preview_${DateTime.now().millisecondsSinceEpoch}$extension');
+          '${fileName}_camera_preview_${encoderSuffix}_${DateTime.now().millisecondsSinceEpoch}$extension');
 
       // 입력 파일 정보 수집
       final inputFileInfo = await _getFileInfo(inputPath);
@@ -406,26 +496,45 @@ class VideoProcessingService {
       final cropY =
           'trunc(ih*${(topOffset / fullScreenHeight).toStringAsFixed(6)})';
 
-      // 플랫폼별 하드웨어 가속 인코더 선택
+      // 인코더 설정 (하드웨어 vs 소프트웨어)
       String videoEncoder;
+      String pixelFormat;
       String encoderType;
+      String additionalParams;
 
-      if (Platform.isIOS) {
-        videoEncoder = "h264_videotoolbox";
-        encoderType = "iOS VideoToolbox 하드웨어 가속";
-      } else if (Platform.isAndroid) {
-        videoEncoder = "h264_mediacodec";
-        encoderType = "Android MediaCodec 하드웨어 가속";
+      if (useHardwareEncoder) {
+        if (Platform.isIOS) {
+          videoEncoder = "h264_videotoolbox";
+          pixelFormat = "nv12";
+          encoderType = "iOS VideoToolbox 하드웨어 가속";
+          additionalParams = "";
+        } else if (Platform.isAndroid) {
+          videoEncoder = "h264_mediacodec";
+          pixelFormat = "nv12";
+          encoderType = "Android MediaCodec 하드웨어 가속";
+          additionalParams = "";
+        } else {
+          videoEncoder = "libx264";
+          pixelFormat = "yuv420p";
+          encoderType = "CPU 기반 소프트웨어 (기본)";
+          additionalParams = "-preset fast";
+        }
       } else {
+        // 소프트웨어 인코더 (폴백)
         videoEncoder = "libx264";
-        encoderType = "CPU 기반 소프트웨어 (fallback)";
+        pixelFormat = "yuv420p";
+        encoderType = "CPU 기반 소프트웨어 인코더 (폴백)";
+        additionalParams = "-preset fast";
       }
 
-      // 하드웨어 가속 최적화 명령어 (비트레이트 기반 화질 제어)
+      // GOP 크기 설정 (fps 기준, 기본값 36)
+      final gopSize = "36";
+
+      // 최적화된 FFmpeg 명령어 구성
       final command = '''
         -i "$inputPath" 
         -vf "crop=$cropWidth:$cropHeight:$cropX:$cropY" 
-        -c:v $videoEncoder -b:v 10M
+        -c:v $videoEncoder -pix_fmt $pixelFormat -g $gopSize -b:v 10M $additionalParams
         -c:a copy "$outputPath"
       '''
           .replaceAll('\n', '')
@@ -451,7 +560,9 @@ class VideoProcessingService {
       logs.add('🎯 크롭 방식: Flutter 카메라 프리뷰 영역 정확 매칭');
       logs.add('📐 크롭 계산: 화면 좌표 → 비디오 해상도 비율 변환');
       logs.add('🚀 비디오 인코더: $encoderType');
-      logs.add('🎬 화질 설정: H.264 비트레이트 10Mbps (하드웨어 최적화)');
+      logs.add('🎨 픽셀 포맷: $pixelFormat');
+      logs.add('🎬 GOP 크기: $gopSize frames');
+      logs.add('🎬 화질 설정: H.264 비트레이트 10Mbps');
       logs.add('🔊 오디오 설정: 원본 복사 (재압축 없음)');
 
       // FFmpeg 실행
@@ -592,14 +703,21 @@ class VideoProcessingService {
             log.contains('VideoToolbox') ||
             log.contains('MediaCodec') ||
             log.contains('encoder not found') ||
+            log.contains('CodecException') ||
+            log.contains('configure failed') ||
             log.contains('No hardware acceleration'));
 
         if (hasInvalidDimensions) {
           detailedMessage +=
               ' [해상도 오류: 가로/세로 크기가 2로 나누어지지 않음 - Android 호환성 문제]';
         } else if (hasHardwareEncoderError) {
-          detailedMessage +=
-              ' [하드웨어 인코더 오류: 기기에서 하드웨어 가속을 지원하지 않음 - CPU 인코더로 재시도 필요]';
+          if (useHardwareEncoder) {
+            detailedMessage +=
+                ' [하드웨어 인코더 오류: 기기에서 하드웨어 가속을 지원하지 않음 - 소프트웨어 인코더로 자동 재시도됩니다]';
+          } else {
+            detailedMessage +=
+                ' [소프트웨어 인코더 오류: CPU 기반 인코딩도 실패 - 기기 호환성 문제]';
+          }
         } else if (hasCodecError) {
           detailedMessage += ' [코덱 오류: H.264 인코딩 문제 - ExoPlayer 호환성 이슈]';
         } else if (hasCropError) {
