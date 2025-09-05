@@ -345,7 +345,7 @@ class VideoProcessingService {
       statusBarHeight: statusBarHeight,
       progressCallback: progressCallback,
     );
-    
+
     return result;
   }
 
@@ -401,7 +401,7 @@ class VideoProcessingService {
         success: true,
         outputPath: softwareResult.outputPath,
       );
-      
+
       return updatedResult;
     }
 
@@ -508,16 +508,22 @@ class VideoProcessingService {
           pixelFormat = "nv12";
           encoderType = "iOS VideoToolbox 하드웨어 가속";
           additionalParams = "";
+          print(
+              '🍎🚀✨🎯🔥💎⚡🎬💪🌟🎭 iOS 하드웨어 가속 인코더 선택! VideoToolbox h264 엔진 시작! 🎪🎨🎵🎊🏆🌈💫⭐🎉🚀');
         } else if (Platform.isAndroid) {
           videoEncoder = "h264_mediacodec";
           pixelFormat = "nv12";
           encoderType = "Android MediaCodec 하드웨어 가속";
           additionalParams = "";
+          print(
+              '🤖🚀⚡🎯🔥💎🌟💪🎬🎪🎭 Android 하드웨어 가속 인코더 선택! MediaCodec h264 엔진 시작! 🎥💨🎨🎵🎊🏆🌈💫⭐🎉🚀✨');
         } else {
           videoEncoder = "libx264";
           pixelFormat = "yuv420p";
           encoderType = "CPU 기반 소프트웨어 (기본)";
           additionalParams = "-preset fast";
+          print(
+              '💻🔧🎯⚙️🛠️💡🔩⚡🌟💪🎪🎭 기타 플랫폼 - CPU 소프트웨어 인코더 선택! libx264 엔진! 🎨🎵🎊🏆🌈💫⭐🎉🚀✨🔥💎');
         }
       } else {
         // 소프트웨어 인코더 (폴백)
@@ -525,6 +531,8 @@ class VideoProcessingService {
         pixelFormat = "yuv420p";
         encoderType = "CPU 기반 소프트웨어 인코더 (폴백)";
         additionalParams = "-preset fast";
+        print(
+            '🔄💔🛠️⚡🔧💡⚙️🔩🌪️😰🆘 하드웨어 가속 실패! CPU 소프트웨어 폴백 모드 시작! 🎭⚡🎪🎨🎵🎊🏆🌈💫⭐🎉🚀✨🔥💎💪🌟');
       }
 
       // GOP 크기 설정 (fps 기준, 기본값 36)
@@ -715,8 +723,7 @@ class VideoProcessingService {
             detailedMessage +=
                 ' [하드웨어 인코더 오류: 기기에서 하드웨어 가속을 지원하지 않음 - 소프트웨어 인코더로 자동 재시도됩니다]';
           } else {
-            detailedMessage +=
-                ' [소프트웨어 인코더 오류: CPU 기반 인코딩도 실패 - 기기 호환성 문제]';
+            detailedMessage += ' [소프트웨어 인코더 오류: CPU 기반 인코딩도 실패 - 기기 호환성 문제]';
           }
         } else if (hasCodecError) {
           detailedMessage += ' [코덱 오류: H.264 인코딩 문제 - ExoPlayer 호환성 이슈]';
