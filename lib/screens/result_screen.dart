@@ -29,7 +29,7 @@ class ResultScreen extends ConsumerWidget {
       backgroundColor: isErrorMode
           ? Colors.red[50]
           : isVideoOnlyMode
-              ? Colors.black
+              ? Colors.amber
               : Colors.blue[50],
       appBar: AppBar(
         title: Text(isErrorMode
@@ -55,7 +55,7 @@ class ResultScreen extends ConsumerWidget {
                     Expanded(
                       flex: 3,
                       child: Container(
-                        color: Colors.black,
+                        color: Colors.red,
                         child: VideoPreviewWidget(
                           videoPath: videoPath!,
                           isVideoOnlyMode: true,
@@ -79,55 +79,55 @@ class ResultScreen extends ConsumerWidget {
               :
               // 기본 결과 화면
               Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        width: double.infinity,
-                        height: 60,
-                        decoration: BoxDecoration(
-                          color: Colors.grey[300],
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Center(
-                          child: Text(
-                            '📹 No recorded video available',
-                            style: TextStyle(
-                              color: Colors.grey,
-                              fontWeight: FontWeight.w500,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          width: double.infinity,
+                          height: 60,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[300],
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Center(
+                            child: Text(
+                              '📹 No recorded video available',
+                              style: TextStyle(
+                                color: Colors.grey,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 24),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: () {
-                                Navigator.popUntil(
-                                    context, (route) => route.isFirst);
-                              },
-                              child: const Text('Home'),
+                        const SizedBox(height: 24),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: () {
+                                  Navigator.popUntil(
+                                      context, (route) => route.isFirst);
+                                },
+                                child: const Text('Home'),
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: ElevatedButton(
-                              onPressed: () {
-                                Navigator.pop(context);
-                              },
-                              child: const Text('Try Again'),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: () {
+                                  Navigator.pop(context);
+                                },
+                                child: const Text('Try Again'),
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
-                    ],
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
     );
   }
 }
