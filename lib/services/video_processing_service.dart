@@ -487,6 +487,31 @@ class VideoProcessingService {
       // 실제 녹화되는 전체 화면 높이 = screenHeight + statusBarHeight
       final fullScreenHeight = screenHeight + statusBarHeight;
 
+      // 🌟💎⚡🔥✨ 크롭 계산 변수 디버깅 출력 시작 ✨🔥⚡💎🌟
+      print(
+          '🌟💎⚡🔥✨ ==================== CROP CALCULATION DEBUG ==================== ✨🔥⚡💎🌟');
+      print('🌟 Flutter 화면 정보:');
+      print('   screenWidth: $screenWidth');
+      print('   screenHeight: $screenHeight');
+      print('   statusBarHeight: $statusBarHeight');
+      print('   fullScreenHeight: $fullScreenHeight');
+      print('');
+      print('💎 카메라 영역 정보:');
+      print('   cameraWidth: $cameraWidth');
+      print('   cameraHeight: $cameraHeight');
+      print('   leftOffset: $leftOffset');
+      print('   topOffset: $topOffset');
+      print('');
+      print('⚡ 비율 계산값:');
+      print(
+          '   cameraWidth/screenWidth: ${(cameraWidth / screenWidth).toStringAsFixed(6)}');
+      print(
+          '   cameraHeight/fullScreenHeight: ${(cameraHeight / fullScreenHeight).toStringAsFixed(6)}');
+      print(
+          '   leftOffset/screenWidth: ${(leftOffset / screenWidth).toStringAsFixed(6)}');
+      print(
+          '   topOffset/fullScreenHeight: ${(topOffset / fullScreenHeight).toStringAsFixed(6)}');
+
       final cropWidth =
           'trunc(iw*${(cameraWidth / screenWidth).toStringAsFixed(6)})';
       final cropHeight =
@@ -495,6 +520,16 @@ class VideoProcessingService {
           'trunc(iw*${(leftOffset / screenWidth).toStringAsFixed(6)})';
       final cropY =
           'trunc(ih*${(topOffset / fullScreenHeight).toStringAsFixed(6)})';
+
+      print('');
+      print('🔥 최종 크롭 파라미터:');
+      print('   cropWidth: $cropWidth');
+      print('   cropHeight: $cropHeight');
+      print('   cropX: $cropX');
+      print('   cropY: $cropY');
+      print(
+          '✨🔥⚡💎🌟 ============================================================== 🌟💎⚡🔥✨');
+      print('');
 
       // 인코더 설정 (하드웨어 vs 소프트웨어)
       String videoEncoder;

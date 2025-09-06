@@ -71,6 +71,7 @@ class ResultScreen extends ConsumerWidget {
                           padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                           child: _GallerySaveButtons(
                             croppedVideoPath: videoPath,
+                            originalVideoPath: originalVideoPath,
                           ),
                         ),
                       ),
@@ -730,9 +731,11 @@ class ErrorInfoWidget extends StatelessWidget {
 // 갤러리 저장 버튼 위젯
 class _GallerySaveButtons extends StatefulWidget {
   final String? croppedVideoPath;
+  final String? originalVideoPath;
 
   const _GallerySaveButtons({
     this.croppedVideoPath,
+    this.originalVideoPath,
   });
 
   @override
@@ -743,6 +746,10 @@ class _GallerySaveButtonsState extends State<_GallerySaveButtons> {
   bool _isCroppedSaving = false;
   double _croppedProgress = 0.0;
   String _croppedStatus = '';
+  
+  bool _isOriginalSaving = false;
+  double _originalProgress = 0.0;
+  String _originalStatus = '';
 
   @override
   Widget build(BuildContext context) {
@@ -750,7 +757,7 @@ class _GallerySaveButtonsState extends State<_GallerySaveButtons> {
       children: [
         const SizedBox(height: 12),
 
-        // 저장 버튼
+        // 크롭된 영상 저장 버튼
         if (widget.croppedVideoPath != null)
           SizedBox(
             width: double.infinity,
@@ -759,26 +766,26 @@ class _GallerySaveButtonsState extends State<_GallerySaveButtons> {
                   _isCroppedSaving ? null : () => _saveCroppedToGallery(),
               icon: Icon(
                 _isCroppedSaving ? Icons.hourglass_empty : Icons.save_alt,
-                size: 25,
+                size: 22,
               ),
               label: Text(
-                _isCroppedSaving ? 'Saving...' : 'Save',
-                style: const TextStyle(fontSize: 17),
+                _isCroppedSaving ? 'Saving Camera Video...' : 'Save Camera Video',
+                style: const TextStyle(fontSize: 15),
               ),
               style: ElevatedButton.styleFrom(
-                minimumSize: const Size.fromHeight(48),
+                minimumSize: const Size.fromHeight(44),
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 backgroundColor: Colors.purple[600],
                 foregroundColor: Colors.white,
               ),
             ),
           ),
         if (_isCroppedSaving) ...[
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           SizedBox(
             width: double.infinity,
-            height: 4,
+            height: 3,
             child: LinearProgressIndicator(
               value: _croppedProgress,
               backgroundColor: Colors.grey[300],
@@ -786,12 +793,59 @@ class _GallerySaveButtonsState extends State<_GallerySaveButtons> {
             ),
           ),
           if (_croppedStatus.isNotEmpty) ...[
-            const SizedBox(height: 4),
+            const SizedBox(height: 3),
             Text(
               _croppedStatus,
-              style: const TextStyle(fontSize: 10, color: Colors.grey),
+              style: const TextStyle(fontSize: 9, color: Colors.grey),
               textAlign: TextAlign.center,
             ),
+          ],
+        ],
+        
+        // 원본 영상 저장 버튼
+        if (widget.originalVideoPath != null) ...[
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed:
+                  _isOriginalSaving ? null : () => _saveOriginalToGallery(),
+              icon: Icon(
+                _isOriginalSaving ? Icons.hourglass_empty : Icons.movie,
+                size: 22,
+              ),
+              label: Text(
+                _isOriginalSaving ? 'Saving Original Video...' : 'Save Original Video',
+                style: const TextStyle(fontSize: 15),
+              ),
+              style: ElevatedButton.styleFrom(
+                minimumSize: const Size.fromHeight(44),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                backgroundColor: Colors.blue[600],
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ),
+          if (_isOriginalSaving) ...[
+            const SizedBox(height: 6),
+            SizedBox(
+              width: double.infinity,
+              height: 3,
+              child: LinearProgressIndicator(
+                value: _originalProgress,
+                backgroundColor: Colors.grey[300],
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.blue[600]!),
+              ),
+            ),
+            if (_originalStatus.isNotEmpty) ...[
+              const SizedBox(height: 3),
+              Text(
+                _originalStatus,
+                style: const TextStyle(fontSize: 9, color: Colors.grey),
+                textAlign: TextAlign.center,
+              ),
+            ],
           ],
         ],
       ],
@@ -854,6 +908,75 @@ class _GallerySaveButtonsState extends State<_GallerySaveButtons> {
           _isCroppedSaving = false;
           _croppedProgress = 0.0;
           _croppedStatus = '';
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error occurred while saving: $e'),
+            backgroundColor: Colors.red[600],
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    }
+  }
+
+  // 원본 영상을 갤러리에 저장
+  Future<void> _saveOriginalToGallery() async {
+    if (widget.originalVideoPath == null || _isOriginalSaving) return;
+
+    setState(() {
+      _isOriginalSaving = true;
+      _originalProgress = 0.0;
+      _originalStatus = 'Preparing to save...';
+    });
+
+    try {
+      final result = await GalleryService.saveVideoToGallery(
+        filePath: widget.originalVideoPath!,
+        albumName: 'FilterPlay',
+        progressCallback: (progress, status) {
+          if (mounted) {
+            setState(() {
+              _originalProgress = progress;
+              _originalStatus = status;
+            });
+          }
+        },
+      );
+
+      if (mounted) {
+        setState(() {
+          _isOriginalSaving = false;
+          _originalProgress = 0.0;
+          _originalStatus = '';
+        });
+
+        if (result.success) {
+          // 성공 스낵바
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Original video saved to gallery! ✅'),
+              duration: Duration(seconds: 3),
+            ),
+          );
+        } else {
+          // 실패 스낵바
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Save failed: ${result.message}'),
+              backgroundColor: Colors.red[600],
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isOriginalSaving = false;
+          _originalProgress = 0.0;
+          _originalStatus = '';
         });
 
         ScaffoldMessenger.of(context).showSnackBar(
