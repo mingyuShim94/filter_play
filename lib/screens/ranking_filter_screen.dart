@@ -76,7 +76,7 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
   double _statusBarHeight = 0;
 
   // 크롭 영역 시각화 관련
-  final bool _showCropArea = false;
+  final bool _showCropArea = true;
 
   // 샘플 셀피 오버레이 관련
   final bool _showSampleSelfie = false;
@@ -96,8 +96,11 @@ class _RankingFilterScreenState extends ConsumerState<RankingFilterScreen> {
   void initState() {
     super.initState();
 
-    // 상태바 숨기기 (immersive 모드)
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersive);
+    // 시스템 UI 표시 (상태바와 네비게이션 바 모두 표시)
+    SystemChrome.setEnabledSystemUIMode(
+      SystemUiMode.manual,
+      overlays: SystemUiOverlay.values,
+    );
 
     _requestPermissionsAndInitialize();
 
